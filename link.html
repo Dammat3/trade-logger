@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="it"><head><meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="link.css">
+</head>
+<body>
+  <h1>Copia online (facoltativa)</h1>
+  <p class="muted">I trade si salvano sempre sul tuo PC e li vedi nel Journal. Se vuoi, puoi anche inviarne una copia a un journal online (Supabase): ogni trade viene inviato da solo, con gli screenshot. Se non ti serve, ignora questa finestra.</p>
+
+  <section id="login">
+    <h2>1. Dati di accesso</h2>
+    <label for="siteUrl">Indirizzo del tuo journal (Netlify)</label>
+    <input id="siteUrl" placeholder="https://tuo-journal.netlify.app">
+    <label for="url">Project URL di Supabase</label>
+    <input id="url" placeholder="https://xxxxxxxx.supabase.co">
+    <label for="key">Publishable key di Supabase</label>
+    <input id="key" placeholder="sb_publishable_...">
+    <label for="email">Email del journal</label>
+    <input id="email" type="email" autocomplete="email">
+    <label for="password">Password del journal</label>
+    <input id="password" type="password">
+    <div class="err" id="err" role="alert"></div>
+    <div class="actions"><button id="doLogin" class="primary">Accedi</button></div>
+  </section>
+
+  <section id="pick" hidden>
+    <h2>2. A quale conto online corrisponde</h2>
+    <p>Collegato come <b id="who"></b></p>
+    <label for="account">Conto online per il conto attivo di Trade Logger</label>
+    <select id="account"></select>
+    <label for="siteUrl2">Indirizzo del journal online (facoltativo)</label>
+    <input id="siteUrl2" placeholder="https://tuo-journal.netlify.app">
+    <div class="err" id="err2" role="alert"></div>
+    <div class="actions">
+      <button id="local">Journal semplice sul PC</button>
+      <button id="logout">Scollega</button>
+      <button id="save" class="primary">Salva</button>
+    </div>
+    <p class="muted small" id="saved" hidden>Salvato. I trade del conto attivo verranno inviati anche a questo conto online. Puoi chiudere la finestra.</p>
+  </section>
+  <script src="link.js"></script>
+</body></html>

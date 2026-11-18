@@ -1,0 +1,7 @@
+Caratteri inclusi nel sito (distribuiti con licenza SIL Open Font License 1.1, che ne permette l'uso e la ridistribuzione):
+- IBM Plex Sans (IBM Corp.)
+- Orbitron (Matt McInerney)
+- Space Grotesk (Florian Karsten)
+- Sora (Jonathan Barnbrook, Julián Moncada)
+Pacchetti di origine: @fontsource/ibm-plex-sans, @fontsource-variable/orbitron, @fontsource-variable/space-grotesk, @fontsource-variable/sora.
+Testo della licenza: https://openfontlicense.org

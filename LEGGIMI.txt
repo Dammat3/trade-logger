@@ -1,0 +1,174 @@
+TRADE LOGGER - versione 0.9.0
+
+Novità 0.9.0
+- Calibrazione anche per lo schermo intero. Ogni piattaforma ha due calibrazioni: "normale" e "schermo intero" (F11 del
+  browser: la barra del browser sparisce e tutto si sposta). Tre puntini > Piattaforma > "Calibra: schermo intero"
+  (o Impostazioni > Piattaforma > "Calibra a schermo intero"): dopo un conto alla rovescia di 10 secondi, in cui metti la
+  piattaforma a schermo intero con un trade aperto, fotografa lo schermo e lo calibra come al solito.
+- In modalità automatica la barra prova ogni calibrazione sullo schermo e usa quella che legge davvero (etichette di
+  TP, SL e ingresso trovate e saldo leggibile). Nella finestra di conferma compare "Layout: normale/schermo intero
+  (riconosciuto da solo)". Se sbaglia: tre puntini > Piattaforma > Layout in uso > "Sempre normale" o "Sempre schermo intero".
+- Se hai una sola calibrazione non cambia nulla.
+
+Novità 0.8.3
+- Tre puntini > "Apri il Journal" ora avvia davvero il programma Journal (se è installato); prima apriva il visualizzatore
+  semplice. Quest'ultimo resta con il nome "Journal semplice (dentro la barra)".
+
+Novità 0.8.2
+- I conti "condivisi" (importati da un'altra persona nel Journal, per studio) non compaiono nella barra: non si può
+  operare su di essi e i loro setup, tag e trade non si mescolano ai tuoi.
+
+Novità 0.8.1
+- Prezzi: se la colonna dei prezzi dello schermo è spostata di qualche pixel rispetto alla calibrazione (per esempio con un
+  altro layout dei grafici) il programma non perde più la prima cifra (25345 letto come 5345): allarga la lettura finché
+  continua il colore dell'etichetta, a sinistra e a destra.
+- Avviso nella conferma se i prezzi hanno un numero di cifre diverso fra loro o dall'ultimo trade sullo stesso simbolo.
+- Simbolo: dalle letture sporche del titolo del grafico ("CME:MNQ1!", "CMEMNQ1!1IC", "CME:MNQ1! FXRe") esce sempre la
+  forma breve (MNQ, ES, NQ, ZB…). Un simbolo sbagliato salvato in passato non fa più da riferimento.
+
+Novità 0.8.0
+- Trade Logger e Journal sono due programmi INDIPENDENTI: si possono aprire insieme o uno senza l'altro.
+  Condividono i dati in Documenti\TradeLogger (trades.json, accounts.json, settings.json, days.json, news.json).
+  Se salvano nello stesso istante non si perde nulla (scrittura sicura con blocco).
+- Conti (live e backtest) locali: si creano e si scelgono dalla barra anche senza nessun collegamento online.
+- Cartella degli screenshot impostabile (Impostazioni > Cartella degli screenshot), la stessa per i due programmi.
+  Nei trade resta solo il nome del file, quindi i dati si possono spostare su un altro PC. Se la cartella scelta
+  non è disponibile (disco scollegato) la barra non si blocca e salva in quella predefinita.
+- Il collegamento a Supabase è diventato una "copia online" facoltativa (tre puntini > Copia online).
+- Le notizie economiche si salvano sul PC (anche senza collegamento) e le legge il Journal.
+- Tre puntini > Apri Journal: avvia il programma Journal se è installato.
+- Eliminando un trade, i suoi screenshot vanno nel cestino.
+
+Novità 0.7.0
+- Condivisione locale (Impostazioni > Condivisione locale, spenta di default): un servizio che gira solo su
+  questo PC (127.0.0.1) e offre trade e screenshot a siti autorizzati, senza database né account. Pensato
+  per un journal che salva i dati nel browser. Chiave, elenco dei siti autorizzati e porta si impostano da lì.
+  Sicurezza: solo loopback, controllo di Host e Origin, chiave per i trade, screenshot con indirizzo casuale.
+- Tre puntini > "Copia link ultimo screenshot": link da incollare dove serve un'immagine (con la condivisione attiva).
+- Guida per chi sviluppa il sito in INTEGRAZIONE-ECLIPSE.md (cartella consegna).
+
+Novità 0.6.2
+- Data del replay (backtest): controllata con il giorno della settimana dell'etichetta ("Thu 25 Sep").
+  Corregge una cifra letta male, l'apostrofo dell'anno letto come cifra ('25 -> 125, che dava 2012),
+  il mese scritto male e l'anno mancante; se la lettura non torna, la data viene evidenziata da controllare.
+- Simbolo: errori di lettura corretti (MNO, MN0 -> MNQ) agganciandosi ai future comuni e ai simboli che hai
+  già usato; "NQ1" non diventa più "N", "MNQ1" non diventa più "MN"; "CME MINI MNQ" non diventa "CME".
+- Nella finestra di conferma, sotto Simbolo e Data compare il testo grezzo letto dallo schermo
+  ("Letto: «Thu 25 Sep '25»"), così si vede subito cosa ha letto il programma.
+
+Novità 0.6.1
+- Setup: quelli creati sulla barra vengono mandati anche al database (come i tag), quindi il sito
+  li mostra in Impostazioni anche se non sono ancora usati in un trade. Quelli già esistenti sul PC
+  vengono consegnati da soli al primo avvio. Un setup tolto dal sito sparisce anche dalla barra.
+- Calibrazione: nuovo passo facoltativo "area dello screenshot nel journal". La lettura dei valori
+  usa sempre tutto lo schermo; nel journal finisce solo l'area scelta (di solito la finestra del
+  browser, senza barra delle applicazioni). Se salti il passo, resta tutto lo schermo come prima.
+
+Novità 0.6.0
+- Notizie economiche: la barra scarica il calendario pubblico (settimana corrente e prossima)
+  all'avvio e ogni 3 ore e lo salva nel database; il sito lo mostra nella pagina News e con
+  un puntino rosso nel calendario. Tre puntini > "Aggiorna notizie economiche" per farlo subito.
+  Prima di usarlo eseguire aggiornamento-0.7.sql in Supabase.
+
+Novità 0.5.2
+- Finestra di conferma: il setup è una tendina con i setup già usati e la voce
+  "+ Nuovo setup…" per scriverne uno nuovo. La tendina c'è anche nella finestra di chiusura,
+  dove si può ancora cambiare il setup del trade.
+
+Novità 0.5.1
+- Riquadri degli ordini letti senza il bordo: valori di TP e SL con il punto dei decimali
+  (713.46 non diventa più 71346).
+- Contratti con i decimali (lotti frazionari, es. 10.12).
+- Controllo incrociato che corregge anche i contratti e usa il valore per punto dello
+  strumento letto (MNQ 2 $, NQ 20 $, MES 5 $, ES 50 $...) e il saldo del conto.
+
+Novità 0.5.0
+- Simbolo letto dallo schermo: nuovo passo facoltativo della calibrazione (rettangolo intorno
+  al nome dello strumento). "CME MINI:MNQ", "MNQZ6", "NQ1!" diventano MNQ, MNQ, NQ.
+
+Novità 0.4.5
+- La scritta del trade aperto sulla barra (es. "NQ ▲") è cliccabile: elenco dei trade aperti,
+  ognuno con Chiudi a TP / SL / a mano ed Elimina (toglie anche dal journal online).
+- Se ci sono più trade aperti accanto al simbolo compare "+1", "+2"...
+
+Novità 0.4.4
+- Saldo cercato anche in una fascia più larga se non è nel rettangolo (su FX Replay, a trade
+  chiuso, il saldo scorre a destra perché sparisce il P&L accanto).
+- Se il saldo resta illeggibile o non torna, alla chiusura con TP o SL il risultato è il
+  valore in denaro letto all'apertura, segnalato da controllare.
+
+Novità 0.4.3
+- Menu dei tre puntini: "Conto" e "Piattaforma" in cima, con sottomenu per cambiarli
+  al volo. Nel sottomenu Piattaforma ci sono anche Calibra e Nuova piattaforma.
+
+Novità 0.4.2
+- Prezzi: ritaglio solo l'interno dell'etichetta (i bordi venivano letti come "1") e
+  lettura basata sulle cifre, con i decimali rimessi al loro posto: i separatori persi o
+  scambiati dall'OCR non contano più.
+- Saldo: viene preso il numero più lungo, non il primo segno letto.
+- Valori di TP e SL: corretti anche quando l'OCR sbaglia di un fattore 1000.
+- Provato con il vero OCR su 4 screenshot reali (3 FX Replay, 1 TradeSea): tutti i valori giusti.
+
+Novità 0.4.1
+- Valori di TP e SL controllati con i prezzi: se l'OCR perde il punto dei decimali
+  (720.00 letto 72000) viene corretto; se uno manca viene ricavato dall'altro.
+- Calibrazione: i clic sui colori valgono solo dentro la colonna dei prezzi.
+- Saldo con il punto per le migliaia (TradeSea: $104.147) letto correttamente.
+- Direzione ricavata da TP e SL anche se l'ingresso non è leggibile.
+
+Novità 0.4.0
+- Piattaforme (Impostazioni > Piattaforma): FX Replay, TradeSea e altre, ognuna con la sua
+  calibrazione. Ogni conto ricorda la sua piattaforma.
+- Calibrazione a 7 passi: si insegnano i colori cliccando sulle etichette di TP, SL e ingresso.
+- Se ci sono più etichette dello stesso colore viene scelta quella con il riquadro dell'ordine.
+- Valore in denaro di TP e SL letto dal riquadro dell'ordine e inviato al sito
+  (serve aggiornamento-0.4.sql nel database).
+
+Novità 0.3.1
+- Etichette riconosciute per tonalità di colore: lo stop loss più scuro ora viene trovato.
+- Lettura dei prezzi in scala di grigi, più precisa; i valori assurdi vengono scartati.
+- Saldo: con un trade aperto viene ignorato il P&L in corso scritto accanto.
+- Contratti letti dal riquadro dell'ordine accanto a TP o SL.
+
+Novità 0.3.0
+- Installatore Windows (Trade Logger Setup 0.3.0.exe) con icona sul desktop e nel menu
+  Start: non serve più PowerShell né npm start.
+- Se il programma è già aperto, un secondo avvio mostra la barra esistente.
+- Per ricreare l'installatore da questi sorgenti: npm install, poi npm run installer
+  (il file esce nella cartella dist).
+
+Novità 0.2.6
+- Finestra Impostazioni (tre puntini, Impostazioni…): scelta del conto, creazione
+  di un conto o backtest nuovo, barra minimal/estesa, scorciatoie da tastiera.
+- Scorciatoie predefinite: Ctrl+Alt+T apre il trade, Ctrl+Alt+P chiude a TP,
+  Ctrl+Alt+L chiude a SL, Ctrl+Alt+M chiude a mano. Si possono cambiare o togliere.
+- Ogni trade resta nel conto in cui è stato aperto, anche se poi cambi conto.
+
+Novità 0.2.5
+- Data e ora del trade: conto live = data e ora del PC; backtest = ora dall'orologio
+  del replay e data dall'etichetta sotto il grafico (calibrazione passi 3 e 4).
+- Scorciatoia per il nuovo trade senza toccare la barra: tieni il mouse sul
+  grafico, così la data del replay è visibile e viene letta.
+- Se la data non si vede, viene proposta l'ultima data usata in quel backtest.
+- Indirizzo e chiave di Supabase: apici e spazi copiati per sbaglio vengono tolti.
+
+Novità 0.2.4
+- Due modalità (menu dei tre puntini): Barra minimal (setup + pulsante note)
+  e Barra estesa (setup, tag e campo note sempre visibili).
+- Setup, tag e note scelti prima di "+ Trade" finiscono nel nuovo trade;
+  con un trade aperto si modificano direttamente quello (e arrivano al sito).
+- I tag nuovi creati dalla barra compaiono anche nel sito.
+
+Novità 0.2
+- Pulsante 🔗: collega la barra al journal online. Ogni trade viene inviato da solo
+  (aperto con lo screenshot di apertura, poi chiuso con risultato e screenshot di chiusura).
+- Se internet non va, il trade resta sul PC e viene inviato appena possibile
+  (riprova ogni 2 minuti e all'avvio).
+- Nella conferma del nuovo trade ci sono anche Data, Orario e Setup.
+- Il pulsante Journal apre il sito. La copia sul PC si apre dalla finestra 🔗.
+
+Avvio
+  npm install      (dopo ogni aggiornamento)
+  npm start
+
+I dati restano in Documenti\TradeLogger (trade, screenshot, calibrazione).

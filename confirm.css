@@ -1,0 +1,26 @@
+body { padding: 16px 18px 20px; }
+h1 { font-size: 18px; margin: 0 0 4px; font-weight: 600; }
+.shot { width: 100%; border: 1px solid var(--line); border-radius: 6px; margin: 10px 0 2px; cursor: zoom-in; display: block; }
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
+.price-tp input { border-left: 3px solid var(--tp); }
+.price-sl input { border-left: 3px solid var(--sl); }
+.price-entry input { border-left: 3px solid var(--entry); }
+.summary { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; margin-top: 10px; }
+.summary div { display: flex; justify-content: space-between; }
+.actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 18px; }
+.hint { font-size: 12px; color: var(--sl); margin-top: 8px; }
+.big { font-size: 22px; font-weight: 600; }
+.tags { display: flex; flex-wrap: wrap; gap: 5px; }
+.tags span { font-size: 12px; border: 1px solid var(--line); border-radius: 999px; padding: 2px 9px; }
+.date-hint { grid-column: 1 / -1; }
+.ok-hint { grid-column: 1 / -1; font-size: 12px; color: var(--tp); margin-top: 8px; }
+.check input { border-color: var(--sl) !important; }
+#setupNew { margin-top: 6px; }
+.rd { display: block; margin-top: 3px; font-size: 11px; color: var(--muted); overflow-wrap: anywhere; }
+.rd.fix { color: var(--sl); }
+
+.muted-note { font-size: 12px; color: var(--muted, #8b93a1); margin: 6px 0 0; }
+
+.tagchip { font: inherit; font-size: 12px; color: var(--muted, #8b919c); background: transparent; border: 1px solid var(--line); border-radius: 999px; padding: 2px 10px; cursor: pointer; }
+.tagchip:hover { color: var(--text, #e8eaee); }
+.tagchip.on { background: #3d7bff; border-color: #3d7bff; color: #fff; }

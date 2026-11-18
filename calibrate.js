@@ -1,0 +1,103 @@
+const $ = (id) => document.getElementById(id);
+const img = $('shot'), sel = $('sel'), wrap = $('wrap'), done = $('done');
+const steps = [
+  { key: 'priceRect', cls: 'price', text: 'Trascina un rettangolo sulla <b>colonna dei prezzi</b> del grafico su cui fai trading: dall\'alto al basso del grafico, largo quanto le etichette dei prezzi.' },
+  { key: 'TP', click: true, optional: true, text: 'Dentro il <b>riquadro verde</b> della colonna dei prezzi, clicca sull\'<b>etichetta colorata del take profit</b> (quella con il prezzo, non il riquadro "+… USD" nel grafico).' },
+  { key: 'SL', click: true, optional: true, text: 'Sempre dentro il riquadro verde, clicca sull\'<b>etichetta colorata dello stop loss</b>.' },
+  { key: 'ENTRY', click: true, optional: true, text: 'Sempre dentro il riquadro verde, clicca sull\'<b>etichetta colorata del prezzo di ingresso</b> (di solito blu).' },
+  { key: 'balanceRect', cls: 'balance', text: 'Trascina un rettangolo stretto intorno al <b>saldo</b> del conto (solo il numero, per esempio $50,000.00).' },
+  { key: 'symbolRect', cls: 'symbol', optional: true, text: 'Trascina un rettangolo intorno al <b>nome dello strumento</b> (per esempio MNQ, in alto a sinistra sul grafico o nella barra in alto). Se lo salti, il simbolo lo scrivi tu la prima volta.' },
+  { key: 'clockRect', cls: 'clock', optional: true, text: '<b>Solo per i backtest:</b> trascina un rettangolo intorno all\'<b>orologio del replay</b> (per esempio 10:49:59 UTC+2).' },
+  { key: 'axisRect', cls: 'axis', optional: true, text: '<b>Solo per i backtest:</b> trascina un rettangolo lungo e basso sulla <b>striscia delle ore sotto il grafico</b>: è lì che compare la data quando il mouse è sul grafico.' },
+  { key: 'shotRect', cls: 'shot', optional: true, text: '<b>Facoltativo:</b> trascina un rettangolo intorno alla parte dello schermo da salvare come screenshot nel journal (di solito la <b>finestra del browser</b>, senza barra delle applicazioni). Per leggere i valori si usa comunque tutto lo schermo. Se salti, nel journal va tutto lo schermo.' },
+];
+let step = 0, start = null, rects = { hues: {} }, platform = '';
+const canvas = document.createElement('canvas'), ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+function showStep() {
+  const st = steps[step];
+  $('msg').innerHTML = st ? `<b>${platform ? platform + ' — ' : ''}passo ${step + 1} di ${steps.length}.</b> ${st.text}` : 'Leggo i valori…';
+  $('skip').hidden = !(st && st.optional);
+  $('skip').textContent = st && st.click ? 'Salta (colore standard)' : 'Salta';
+  wrap.style.cursor = st && st.click ? 'pointer' : 'crosshair';
+}
+function reset() { step = 0; rects = { hues: {} }; done.innerHTML = ''; $('result').hidden = true; showStep(); }
+function next() { step++; showStep(); if (step === steps.length) finish(); }
+
+function hueAt(nx, ny) {
+  // media 3x3 intorno al punto cliccato, poi tonalità (0-360)
+  const d = ctx.getImageData(Math.max(0, nx - 1), Math.max(0, ny - 1), 3, 3).data;
+  let r = 0, g = 0, b = 0; for (let i = 0; i < d.length; i += 4) { r += d[i]; g += d[i + 1]; b += d[i + 2]; }
+  r /= 9; g /= 9; b /= 9;
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b), dd = mx - mn;
+  if (!mx || dd / mx < 0.25 || mx < 64) return null;   // grigio o troppo scuro: non è un'etichetta colorata
+  let h = mx === r ? ((g - b) / dd) % 6 : mx === g ? (b - r) / dd + 2 : (r - g) / dd + 4;
+  h *= 60; if (h < 0) h += 360;
+  return { h: Math.round(h), rgb: `rgb(${Math.round(r)},${Math.round(g)},${Math.round(b)})` };
+}
+
+async function finish() {
+  $('skip').hidden = true;
+  const r = await api.saveCalibration(rects);
+  const v = (x) => (x === null || x === undefined ? '<span class="neg">non letto</span>' : x);
+  $('msg').innerHTML = `<b>Calibrazione salvata${platform ? ' per ' + platform : ''}.</b> Controlla qui sotto cosa ho letto. Se qualcosa è sbagliato premi Ricomincia.`;
+  $('result').hidden = false;
+  $('result').innerHTML = `<table>
+    <tr><td class="muted">Take profit</td><td>${v(r.tp)}</td><td class="muted">valore</td><td>${v(r.tpUsd)}</td></tr>
+    <tr><td class="muted">Stop loss</td><td>${v(r.sl)}</td><td class="muted">valore</td><td>${v(r.slUsd)}</td></tr>
+    <tr><td class="muted">Ingresso</td><td>${v(r.entry)}</td><td class="muted">contratti</td><td>${v(r.contracts)}</td></tr>
+    <tr><td class="muted">Direzione</td><td>${v(r.direction)}</td><td class="muted">saldo</td><td>${v(r.balance)}</td></tr>
+    <tr><td class="muted">Screenshot nel journal</td><td>${r.hasShot ? 'solo l\'area scelta' : 'tutto lo schermo'}</td><td></td><td></td></tr>
+        <tr><td class="muted">Simbolo</td><td>${r.hasSymbol ? v(r.symbol) : '<span class="muted">saltato</span>'}</td><td></td><td></td></tr>
+    <tr><td class="muted">Ora del replay</td><td>${r.hasClock ? v(r.replayTime) : '<span class="muted">saltato</span>'}</td><td class="muted">data</td><td>${r.hasAxis ? (r.replayDate || '<span class="muted">non visibile ora</span>') : '<span class="muted">saltato</span>'}</td></tr></table>
+    <div class="muted note">Se non c'era un trade aperto sullo schermo è normale che prezzi, valori e contratti risultino "non letti".</div>`;
+}
+
+function pos(e) {
+  const r = img.getBoundingClientRect();
+  return { x: Math.min(Math.max(e.clientX - r.left, 0), r.width), y: Math.min(Math.max(e.clientY - r.top, 0), r.height) };
+}
+function boxStyle(el, a, b) {
+  el.style.left = Math.min(a.x, b.x) + 'px'; el.style.top = Math.min(a.y, b.y) + 'px';
+  el.style.width = Math.abs(a.x - b.x) + 'px'; el.style.height = Math.abs(a.y - b.y) + 'px';
+}
+
+wrap.addEventListener('mousedown', (e) => {
+  if (step >= steps.length) return;
+  const st = steps[step], k = img.naturalWidth / img.clientWidth, p = pos(e);
+  if (st.click) {
+    const pr = rects.priceRect, nx = p.x * k, ny = p.y * k;
+    if (pr && (nx < pr.x - 4 || nx > pr.x + pr.width + 4 || ny < pr.y - 4 || ny > pr.y + pr.height + 4)) {
+      $('msg').innerHTML = `<span class="neg">Hai cliccato fuori dalla colonna dei prezzi.</span> ${st.text}`; return;
+    }
+    const c = hueAt(Math.round(p.x * k), Math.round(p.y * k));
+    if (!c) { $('msg').innerHTML = `<span class="neg">Lì non c'è un colore deciso.</span> ${st.text} (clicca sul fondo colorato dell'etichetta, non sulle cifre)`; return; }
+    rects.hues[st.key] = c.h;
+    const dot = document.createElement('div'); dot.className = 'pick'; dot.style.left = p.x + 'px'; dot.style.top = p.y + 'px'; dot.style.background = c.rgb; dot.title = st.key; done.appendChild(dot);
+    next(); return;
+  }
+  start = p; sel.hidden = false; boxStyle(sel, start, start);
+});
+window.addEventListener('mousemove', (e) => { if (start) boxStyle(sel, start, pos(e)); });
+window.addEventListener('mouseup', (e) => {
+  if (!start) return;
+  const end = pos(e); const a = start; start = null; sel.hidden = true;
+  if (Math.abs(a.x - end.x) < 5 || Math.abs(a.y - end.y) < 5) return;
+  const k = img.naturalWidth / img.clientWidth;
+  rects[steps[step].key] = {
+    x: Math.round(Math.min(a.x, end.x) * k), y: Math.round(Math.min(a.y, end.y) * k),
+    width: Math.round(Math.abs(a.x - end.x) * k), height: Math.round(Math.abs(a.y - end.y) * k),
+  };
+  const box = document.createElement('div'); box.className = 'box ' + steps[step].cls; boxStyle(box, a, end); done.appendChild(box);
+  next();
+});
+
+$('skip').onclick = () => next();
+$('redo').onclick = reset;
+$('close').onclick = () => api.closeCalibration();
+api.getCalibration().then((c) => {
+  if (!c) return;
+  platform = c.platform || '';
+  img.onload = () => { canvas.width = img.naturalWidth; canvas.height = img.naturalHeight; ctx.drawImage(img, 0, 0); reset(); };
+  img.src = c.image;
+});

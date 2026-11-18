@@ -1,0 +1,38 @@
+JOURNAL - versione 1.2.0 (programma sul PC)
+
+Che cos'è
+  Il journal di trading come programma che gira sul tuo PC: senza internet, senza database e senza account.
+  È indipendente da Trade Logger: si aprono insieme o uno senza l'altro. Condividono soltanto i dati, che stanno
+  in file nella cartella Documenti\TradeLogger (trades.json, accounts.json, settings.json, days.json, news.json).
+  Gli screenshot stanno in una cartella che si sceglie dalle Impostazioni (di Journal o di Trade Logger).
+
+Cosa c'è
+  Dashboard, Reports, Progress, News (notizie economiche, si scaricano da sole se c'è internet), Impostazioni,
+  sette temi grafici, esportazione e importazione CSV, foto incollate nei trade (Ctrl+V), analisi dei giorni.
+  Impostazioni > Dati sul tuo PC: cartelle, copia di sicurezza, importazione dal journal online (Supabase).
+
+Novità 1.2.0
+  Condividere un trade come post (Instagram e altri social). Nella scheda di ogni trade chiuso c'è il pulsante
+  "Condividi come post": prepara una card nel tema in uso (formato feed 4:5, quadrato o storia 9:16) e un testo
+  già scritto in italiano (tre versioni, hashtag). Risultato in R, in dollari o nascosto; screenshot e curva facoltativi.
+  Sui conti backtest la card e il testo dicono sempre che è un backtest. "Prepara per Instagram" salva l'immagine
+  (JPEG) in Documenti\TradeLogger\post, copia il testo, apre la cartella e Instagram. Nessuna pubblicazione
+  automatica e nessun collegamento ai social.
+
+Novità 1.1.0
+  Condividere i trade per studio: Impostazioni > Dati sul tuo PC > "Condividi per studio…" crea un file .journalshare
+  (periodo, note, emozioni, analisi dei giorni, screenshot e, se vuoi, importi nascosti: 100 = rischio tipico).
+  L'altra persona lo importa con "Importa un pacchetto condiviso…" nel suo Journal: diventa un conto separato
+  "(condiviso)", dove può annotare senza toccare i suoi dati; chi ha creato il pacchetto non vede nulla di quello che scrive.
+
+Come si ricostruiscono gli installatori (solo per sviluppare)
+  Trade Logger:  npm install, poi npm run installer           (usa package.json)
+  Journal:       copia questi file in una cartella vuota e poi npm install e npx electron-builder --win nsis
+                 package.journal.json (rinominato package.json), journal-main.js, preload-journal.js, journalcore.js,
+                 store.js, newsfetch.js, news.js, la cartella journal-ui e la cartella build.
+  La cartella journal-ui si rigenera con ./build-journal-ui.sh dall'interfaccia del sito (cartella web del progetto
+  journal): l'interfaccia è la stessa del sito online.
+
+Dati e sicurezza
+  Le scritture dei file sono atomiche e protette da un blocco: se barra e Journal salvano nello stesso istante non si
+  perde nulla. Il Journal non apre altre finestre né pagine esterne; i contenuti della pagina sono limitati ai suoi file.

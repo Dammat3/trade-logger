@@ -1,0 +1,32 @@
+name: Build Windows
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  win:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - name: Trade Logger
+        shell: bash
+        run: |
+          npm install
+          npx electron-builder --win nsis
+          mkdir out && cp dist/Trade-Logger-Setup-*.exe dist/Trade-Logger-Setup-*.exe.blockmap dist/latest.yml out/
+      - name: Journal
+        shell: bash
+        run: |
+          rm -rf dist && cp package.json package.bar.json && cp package.journal.json package.json
+          npm install
+          npx electron-builder --win nsis
+          cp dist/Journal-Setup-*.exe dist/Journal-Setup-*.exe.blockmap dist/journal.yml out/
+      - uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with: { files: out/* }
+      - uses: actions/upload-artifact@v4
+        with: { name: windows-app, path: out/* }

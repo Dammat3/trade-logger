@@ -1,0 +1,7 @@
+body { padding: 18px 22px 24px; }
+h1 { font-size: 19px; margin: 0 0 4px; font-weight: 600; }
+h2 { font-size: 15px; margin: 22px 0 2px; font-weight: 600; }
+p { margin: 6px 0; }
+.small { font-size: 12px; }
+.err { color: var(--danger); font-size: 13px; margin-top: 10px; min-height: 1em; }
+.actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 14px; }

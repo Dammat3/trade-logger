@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="it"><head><meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'">
+<link rel="stylesheet" href="toolbar.css">
+</head>
+<body>
+  <div class="bar">
+    <div class="grip" id="grip" title="Trascina per spostare" aria-label="Sposta la barra">
+      <svg width="6" height="16" viewBox="0 0 6 16" aria-hidden="true"><g fill="currentColor"><circle cx="1.5" cy="2" r="1.2"/><circle cx="4.5" cy="2" r="1.2"/><circle cx="1.5" cy="8" r="1.2"/><circle cx="4.5" cy="8" r="1.2"/><circle cx="1.5" cy="14" r="1.2"/><circle cx="4.5" cy="14" r="1.2"/></g></svg>
+    </div>
+    <span id="dot" class="dot" role="status"></span>
+    <span id="trade" class="trade"></span>
+    <button id="new" class="new" title="Nuovo trade: fotografa lo schermo e legge il trade">
+      <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M5 1v8M1 5h8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>Trade
+    </button>
+    <button id="tp" class="out tp" title="Chiudi: take profit">TP</button>
+    <button id="sl" class="out sl" title="Chiudi: stop loss">SL</button>
+    <button id="man" class="out man" title="Chiudi: a mano o in pareggio">Man</button>
+    <div class="sep"></div>
+    <button id="setup" class="pick" title="Setup"><span class="lbl">Setup</span><svg width="8" height="8" viewBox="0 0 8 8" aria-hidden="true"><path d="M1 2.5l3 3 3-3" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg></button>
+    <button id="tags" class="pick" title="Tag"><span class="lbl">Tag</span><svg width="8" height="8" viewBox="0 0 8 8" aria-hidden="true"><path d="M1 2.5l3 3 3-3" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg></button>
+    <input id="noteIn" class="note-in ext" placeholder="Note…" aria-label="Note" spellcheck="false">
+    <button id="noteBtn" class="note-btn min" title="Note" aria-label="Note">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4z"/><path d="M13.5 6.5l4 4"/></svg>
+    </button>
+    <button id="more" class="more" title="Altro: journal, calibrazione, collegamento, chiudi" aria-label="Altro">
+      <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><g fill="currentColor"><circle cx="2" cy="6" r="1.3"/><circle cx="6" cy="6" r="1.3"/><circle cx="10" cy="6" r="1.3"/></g></svg>
+    </button>
+  </div>
+  <script src="toolbar.js"></script>
+</body></html>

@@ -1,0 +1,87 @@
+{
+  "name": "journal-local",
+  "version": "1.6.0",
+  "description": "Journal di trading sul PC: dati in cartelle, senza internet né account",
+  "main": "journal-main.js",
+  "dependencies": {
+    "@supabase/supabase-js": "2.45.4",
+    "electron-updater": "6.3.9"
+  },
+  "devDependencies": {
+    "electron": "33.2.0",
+    "electron-builder": "25.1.8"
+  },
+  "author": "Davide",
+  "build": {
+    "appId": "it.tradelogger.journal",
+    "productName": "Journal",
+    "directories": {
+      "output": "dist"
+    },
+    "asar": false,
+    "files": [
+      "journal-main.js",
+      "updater.js",
+      "preload-journal.js",
+      "journalcore.js",
+      "store.js",
+      "newsfetch.js",
+      "news.js",
+      "journal-ui/**",
+      "build/journal-icon.png",
+      "package.json",
+      "node_modules/**"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "build/journal-icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Journal",
+      "runAfterFinish": true,
+      "installerIcon": "build/journal-icon.ico",
+      "uninstallerIcon": "build/journal-icon.ico",
+      "uninstallDisplayName": "Journal",
+      "artifactName": "Journal-Setup-${version}.exe"
+    },
+    "mac": {
+      "category": "public.app-category.finance",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/journal-icon.png",
+      "identity": null,
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false,
+      "artifactName": "Journal ${version}-${arch}.${ext}"
+    },
+    "publish": [
+      {
+        "provider": "generic",
+        "url": "https://example.invalid/aggiornamenti",
+        "channel": "journal"
+      }
+    ]
+  },
+  "scripts": {
+    "installer-mac": "electron-builder --mac dmg zip"
+  }
+}

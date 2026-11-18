@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="it"><head><meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="settings.css">
+</head>
+<body>
+  <h1>Impostazioni</h1>
+  <p class="muted lead">Tutto quello che serve per far funzionare la barra, in ordine di importanza.</p>
+
+  <section class="card">
+    <h2>Conto</h2>
+    <p class="muted small">I nuovi trade vengono salvati in questo conto. Con un backtest, data e ora vengono prese dal replay.</p>
+    <div id="notLinked" hidden>
+      <p>La barra non è collegata al journal.</p>
+      <button id="goLink" class="primary">Collega al journal</button>
+    </div>
+    <div id="linked" hidden>
+      <div class="row">
+        <select id="account" aria-label="Conto"></select>
+        <button id="showNew">Nuovo…</button>
+      </div>
+      <div id="newBox" class="newbox" hidden>
+        <label for="newName">Nome del nuovo conto</label>
+        <input id="newName" placeholder="Es. Backtest NQ novembre">
+        <label for="newKind">Tipo</label>
+        <select id="newKind"><option value="conto">Conto (live): data e ora del PC</option><option value="backtest">Backtest: data e ora del replay</option></select>
+        <div class="row end"><button id="cancelNew">Annulla</button><button id="createNew" class="primary">Crea e usa</button></div>
+      </div>
+      <p class="msg" id="accMsg" role="status"></p>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Piattaforma e calibrazione</h2>
+    <p class="muted small">Ogni piattaforma (FX Replay, TradeSea…) ha la sua calibrazione e i suoi colori. La scelta viene ricordata per il conto selezionato sopra.</p>
+
+    <div class="group">
+      <div class="gtitle">Piattaforma</div>
+      <div class="row">
+        <select id="platform" aria-label="Piattaforma"></select>
+        <button id="showNewPl">Nuova…</button>
+      </div>
+      <div id="newPlBox" class="newbox" hidden>
+        <label for="newPlName">Nome della piattaforma</label>
+        <input id="newPlName" placeholder="Es. TradeSea">
+        <div class="row end"><button id="cancelPl">Annulla</button><button id="createPl" class="primary">Crea</button></div>
+      </div>
+    </div>
+
+    <div class="group">
+      <div class="gtitle">Calibrazione</div>
+      <div class="btns">
+        <button id="calibrate" class="primary">Calibra</button>
+        <button id="calibrateFull">Calibra a schermo intero</button>
+      </div>
+      <p class="muted small">"Calibra" è la calibrazione normale. Se a volte usi la piattaforma a schermo intero (F11) tutto si sposta: calibra anche quel layout e la barra riconosce da sola quale usare. Con due monitor di misura diversa, calibra una volta su ciascuno.</p>
+      <label for="layoutMode">Layout in uso</label>
+      <select id="layoutMode" aria-label="Layout in uso">
+        <option value="auto">Automatico (consigliato)</option>
+        <option value="normal">Sempre normale</option>
+        <option value="full">Sempre schermo intero</option>
+      </select>
+    </div>
+
+    <div class="group">
+      <div class="gtitle">Verifica</div>
+      <div class="btns"><button id="testRead">Prova la lettura</button></div>
+      <p class="muted small">Ti dà 4 secondi: la finestra sparisce, metti in vista il grafico e la barra legge lo schermo. Poi vedi cosa ha capito. Non salva niente.</p>
+      <div id="testOut" class="newbox" hidden></div>
+    </div>
+    <p class="msg" id="plMsg" role="status"></p>
+  </section>
+
+  <section class="card">
+    <h2>Barra</h2>
+    <p class="muted small">Quanto spazio occupa sullo schermo.</p>
+    <div class="choice">
+      <label><input type="radio" name="mode" value="minimal"> <span><b>Minimal</b><br><span class="muted small">Setup, tag e pulsante per le note</span></span></label>
+      <label><input type="radio" name="mode" value="tasti"> <span><b>Tasti rapidi</b><br><span class="muted small">La più piccola: solo Setup e Tag. Apri e chiudi i trade con le scorciatoie da tastiera</span></span></label>
+      <label><input type="radio" name="mode" value="estesa"> <span><b>Estesa</b><br><span class="muted small">Come minimal, ma con il campo note sempre visibile</span></span></label>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Scorciatoie da tastiera</h2>
+    <p class="muted small">Funzionano anche mentre stai usando FX Replay. Clicca su una scorciatoia e premi la nuova combinazione (con Ctrl, Alt o Shift).</p>
+    <div class="keys" id="keys"></div>
+    <p class="msg" id="keyMsg" role="status"></p>
+  </section>
+
+  <section class="card">
+    <h2>Cartella degli screenshot</h2>
+    <p class="muted small">Gli screenshot dei trade si salvano qui. È la stessa cartella che usa il Journal: se la cambi da una parte, vale anche per l'altra.</p>
+    <div class="row"><input id="shotDir" readonly><button id="shotChange">Cambia…</button><button id="shotOpen">Apri</button></div>
+    <p class="msg" id="shotMsg" role="status"></p>
+  </section>
+
+  <section class="card">
+    <h2>Aggiornamenti</h2>
+    <p class="muted small">Versione installata: <b id="ver">—</b>. Se indichi dove trovare le nuove versioni, la barra controlla da sola all'avvio e ti chiede se aggiornare.</p>
+    <label for="updUrl">Indirizzo degli aggiornamenti (lo ricevi da chi pubblica le versioni)</label>
+    <input id="updUrl" placeholder="https://github.com/NOME/trade-logger/releases/latest/download" spellcheck="false">
+    <div class="btns top"><button id="updSave">Salva</button><button id="updCheck" class="primary">Controlla ora</button></div>
+    <p class="msg" id="updMsg" role="status"></p>
+  </section>
+
+  <details class="card adv">
+    <summary><span class="h2">Condivisione locale</span><span class="pill" id="locPill">Spenta</span><span class="muted small tag">per esperti</span></summary>
+    <p class="muted small">Serve solo se vuoi che un sito (per esempio un journal che salva i dati nel browser) legga i tuoi trade e screenshot da questo PC. Niente database e niente account. <b>Se non sai di cosa si tratta, lasciala spenta: non ti serve</b> per usare Trade Logger e il Journal.</p>
+    <label class="check"><input type="checkbox" id="locOn"> <span>Attiva la condivisione locale</span></label>
+    <label for="locAddr">Indirizzo (lo usa il sito)</label>
+    <div class="row"><input id="locAddr" readonly><button id="locCopyAddr">Copia</button></div>
+    <label for="locKey">Chiave (il sito la chiede una volta)</label>
+    <div class="row"><input id="locKey" readonly><button id="locCopyKey">Copia</button><button id="locRegen" title="Crea una nuova chiave: i siti dovranno riceverla di nuovo">Nuova</button></div>
+    <label for="locOrigins">Siti autorizzati (uno per riga)</label>
+    <textarea id="locOrigins" rows="3" spellcheck="false" placeholder="https://eclipsejournal.netlify.app"></textarea>
+    <label for="locPort">Porta</label>
+    <input id="locPort" type="number" min="1024" max="65535" class="short">
+    <div class="row end"><button id="locOpen" hidden>Apri pagina di prova</button><button id="locSave" class="primary">Salva</button></div>
+    <p class="msg" id="locMsg" role="status"></p>
+    <p class="muted small">Chi ha la chiave e usa un sito dell'elenco può leggere i tuoi trade e screenshot: autorizza solo siti di cui ti fidi. Quando il sito si collega, Chrome mostra un permesso («accesso alla rete locale»).</p>
+  </details>
+
+  <script src="settings.js"></script>
+</body></html>

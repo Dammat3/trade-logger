@@ -1,0 +1,8 @@
+html, body { height: 100%; }
+body { padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+label { margin: 0; }
+#box { flex: 1; display: flex; }
+#box textarea, #box input { flex: 1; }
+#box textarea { resize: none; min-height: 0; }
+.actions { display: flex; gap: 8px; align-items: center; }
+.hint { flex: 1; font-size: 11.5px; }

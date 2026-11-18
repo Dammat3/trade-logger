@@ -1,0 +1,49 @@
+body { padding: 18px 22px 26px; }
+h1 { font-size: 19px; margin: 0 0 6px; font-weight: 600; }
+h2 { font-size: 14.5px; margin: 0 0 4px; font-weight: 600; }
+section, details.card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px 14px; margin-top: 14px; }
+section > h2, .h2 { font-size: 15px; font-weight: 600; margin: 0 0 4px; }
+.lead { margin: 0 0 4px; }
+.group { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); }
+.group:first-of-type { margin-top: 14px; }
+.gtitle { font-size: 11.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 600; margin-bottom: 10px; }
+.btns { display: flex; gap: 10px; flex-wrap: wrap; }
+.btns button { flex: 1 1 150px; padding: 9px 12px; }
+.group p.small { margin: 10px 0 8px; line-height: 1.5; }
+.group label { margin-top: 12px; }
+section .newbox, details .newbox { background: var(--bg); }
+details.adv > summary { cursor: pointer; list-style: none; display: flex; align-items: center; gap: 10px; }
+details.adv > summary::-webkit-details-marker { display: none; }
+details.adv > summary::before { content: '▸'; color: var(--muted); font-size: 12px; }
+details.adv[open] > summary::before { content: '▾'; }
+details.adv[open] > summary { margin-bottom: 8px; }
+.pill { font-size: 11.5px; padding: 2px 9px; border-radius: 99px; background: #2a2e38; color: var(--muted); font-weight: 600; }
+.pill.on { background: rgba(47,191,113,.16); color: var(--tp); }
+.tag { margin-left: auto; }
+details.adv label { margin-top: 12px; }
+p { margin: 4px 0 10px; }
+.small { font-size: 12px; }
+.row { display: flex; gap: 8px; align-items: center; }
+.row.end { justify-content: flex-end; margin-top: 12px; }
+.row select { flex: 1; }
+.newbox { margin-top: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); }
+.newbox label:first-child { margin-top: 0; }
+.msg { font-size: 12.5px; min-height: 1em; }
+.msg.ok { color: var(--tp); } .msg.err { color: var(--danger); }
+.choice { display: flex; gap: 10px; }
+.choice label { flex: 1; display: flex; gap: 8px; align-items: flex-start; margin: 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; color: var(--text); font-size: 13.5px; cursor: pointer; }
+.choice label:has(input:checked) { border-color: var(--entry); background: rgba(47, 107, 255, .1); }
+.choice input { width: auto; margin-top: 3px; }
+.keys { display: grid; grid-template-columns: 1fr auto auto auto; gap: 10px 8px; margin-top: 10px; align-items: center; }
+.keys .name { font-size: 13.5px; }
+.keys .combo { min-width: 150px; font-family: inherit; font-weight: 600; justify-content: center; }
+.keys .combo.rec { border-color: var(--entry); color: var(--entry); }
+.keys .combo.bad { border-color: var(--danger); color: var(--danger); }
+.keys .combo.none { color: var(--muted); font-weight: 400; }
+.keys .small-btn { padding: 6px 9px; font-size: 12px; }
+.check { display: flex; gap: 8px; align-items: center; margin: 8px 0 4px; color: var(--text); font-size: 13.5px; cursor: pointer; }
+.check input { width: auto; }
+input.short { width: 120px; }
+textarea { font-family: inherit; }
+.btns.top { margin-top: 14px; }
+section > label { margin-top: 14px; }
