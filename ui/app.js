@@ -1603,6 +1603,10 @@ function renderSettings() {
         <button class="theme-opt ${id === th ? 'on' : ''}" data-theme-pick="${id}" role="radio" aria-checked="${id === th}">${preview(id)}
           <span class="tp-name">${t.name}${id === th ? '<span class="chk">✓</span>' : ''}</span><span class="muted small">${t.desc}</span></button>`).join('')}</div>
       <div class="foot-note">Il tema cambia solo l'aspetto: le funzioni sono identiche. Si ricorda su questo dispositivo e sugli altri dove accedi con lo stesso account. Lo trovi anche nel menu del profilo, in alto a destra.</div></section>
+    ${S.local ? `<section class="card"><div class="card-head"><h2>Aggiornamenti</h2></div>
+      <div class="pad-box"><label class="field"><span>Versione del Journal installata</span><input class="input" readonly value="${esc((S.localInfo && S.localInfo.version) || 'sconosciuta')}"></label>
+        <button class="btn primary" data-act="upd-check">Cerca aggiornamenti</button>
+        <p class="muted small" style="margin:8px 0 0">Il Journal controlla da solo all'avvio. L'indirizzo degli aggiornamenti si imposta una volta sola nelle impostazioni di Trade Logger.</p></div></section>` : ''}
     ${S.local ? localCard() : ''}
     <section class="card"><div class="card-head"><h2>Conti e backtest</h2><div class="grow"></div><button class="btn" data-act="newacc">+ Nuovo</button></div>
       <div class="table-wrap"><table><thead><tr><th>Nome</th><th>Tipo</th><th></th></tr></thead><tbody>
@@ -1642,10 +1646,7 @@ function renderSettings() {
           <p class="muted small" style="margin:4px 0 0">Il CSV si apre con Excel. Per importare servono almeno le colonne Data e P&amp;L; vanno bene anche i nomi in inglese e il file esportato da Trade Logger.</p>
         </div></section>
     </div>
-    ${S.local ? `<div class="grid2"><section class="card"><div class="card-head"><h2>Aggiornamenti</h2></div>
-        <div class="pad-box"><p class="muted small" style="margin:0 0 10px">Versione installata: <b>${esc((S.localInfo && S.localInfo.version) || '')}</b></p>
-          <button class="btn primary" data-act="upd-check">Cerca aggiornamenti</button>
-          <p class="muted small" style="margin:8px 0 0">Il Journal controlla da solo all'avvio. L'indirizzo degli aggiornamenti si imposta una volta sola nelle impostazioni di Trade Logger.</p></div></section></div>` : ''}`;
+`;
 
   page.onchange = async (e) => {
     const k = e.target.closest('[data-kind]');
