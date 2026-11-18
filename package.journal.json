@@ -1,6 +1,6 @@
 {
   "name": "journal-local",
-  "version": "1.6.3",
+  "version": "1.6.4",
   "description": "Journal di trading sul PC: dati in cartelle, senza internet né account",
   "main": "journal-main.js",
   "dependencies": {
