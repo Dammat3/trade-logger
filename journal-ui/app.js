@@ -1682,9 +1682,8 @@ function renderSettings() {
       }
       if (d.delAcc) {
         const a = S.accounts.find((x) => x.id === d.delAcc);
-        const r = await dialog({ title: `Eliminare "${a.name}"?`, text: 'Vengono cancellati per sempre tutti i suoi trade, le foto e le analisi. Per confermare scrivi il nome del conto.', okText: 'Elimina per sempre', danger: true, fields: [{ name: 'name', label: 'Nome del conto' }] });
-        if (!r) return;
-        if (r.name.trim() !== a.name) { toast('Il nome non corrisponde: niente è stato eliminato.', true); return; }
+        const ok = await confirmBox(`Eliminare "${a.name}"?`, 'Vengono cancellati per sempre tutti i suoi trade, le foto e le analisi. Non si può annullare.', 'Elimina per sempre');
+        if (!ok) return;
         await S.db.deleteAccount(a.id);
         S.accounts = S.accounts.filter((x) => x.id !== a.id);
         if (S.accountId === a.id) await switchAccount(S.accounts[0].id); else renderSettings();
