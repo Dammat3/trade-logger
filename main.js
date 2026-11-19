@@ -7,7 +7,7 @@ const path = require('path');
 const fs = require('fs');
 const { createWorker } = require('tesseract.js');
 const { parseSymbolEx, parseReplayDateSmart } = require('./analyzer');
-const { boxColumns, findLabels, findOrderBox, labelSpan, decimalsOf, pickPrices, parseContracts, parseBoxMoney, parseBalance, reconcileMoney, parseNumber, direction, parseReplayTime, parseReplayDate } = require('./analyzer');
+const { labelCoverage, boxColumns, findLabels, findOrderBox, labelSpan, decimalsOf, pickPrices, parseContracts, parseBoxMoney, parseBalance, reconcileMoney, parseNumber, direction, parseReplayTime, parseReplayDate } = require('./analyzer');
 const { createClient } = require('@supabase/supabase-js');
 
 const store = require('./store');
@@ -143,27 +143,29 @@ function relocateCfg(img, cfg) {
   try {
     if (!cfg.priceRect) return { cfg, dx: 0 };
     const r = clampRect(cfg.priceRect, img), imgW = img.getSize().width;
-    const labelsAt = (x) => {                                     // quante etichette (TP, SL, ingresso) vedo in una colonna larga come quella calibrata
-      const rr = clampRect({ ...cfg.priceRect, x }, img), c = img.crop(rr), sz = c.getSize(), L = findLabels(c.toBitmap(), sz.width, sz.height, cfg.hues);
-      return ['TP', 'SL', 'ENTRY'].filter((n) => L[n]).length;
+    // punteggio di una colonna larga come quella calibrata, messa in x: somma della "solidità" delle etichette TP, SL, ingresso
+    // (conta solo chi supera la soglia; linee tratteggiate e riquadri degli ordini restano sotto)
+    const scoreAt = (x) => {
+      const rr = clampRect({ ...cfg.priceRect, x }, img), c = img.crop(rr), sz = c.getSize(), cov = labelCoverage(c.toBitmap(), sz.width, sz.height, cfg.hues);
+      const vals = ['TP', 'SL', 'ENTRY'].map((n) => cov[n]).filter((v) => v >= 0.4);
+      return { n: vals.length, sum: vals.reduce((a, b) => a + b, 0) };
     };
-    const base = labelsAt(r.x);
-    if (base >= 2) return { cfg, dx: 0 };                      // la calibrazione trova già le etichette: non tocco niente
-    const scoreAt = labelsAt;
+    const base = scoreAt(r.x);
+    if (base.n >= 2) return { cfg, dx: 0 };                      // la calibrazione trova già le etichette: non tocco niente
     const pts = [];
-    for (let x = 0; x + r.width <= imgW; x += 16) pts.push({ x, sc: scoreAt(x) });
-    const top = Math.max(...pts.map((q) => q.sc));
-    if (top < 2 || top <= base) return { cfg, dx: 0 };
-    // più posizioni vicine danno lo stesso punteggio (la finestra vede l'etichetta anche solo in parte): prendo il centro del gruppo
-    // consecutivo con il punteggio massimo più vicino a dove ero
+    for (let x = 0; x + r.width <= imgW; x += 6) { const q = scoreAt(x); pts.push({ x, n: q.n, sum: q.sum }); }
+    const maxN = Math.max(...pts.map((q) => q.n));
+    if (maxN < 2 || maxN <= base.n) return { cfg, dx: 0 };
+    const top = Math.max(...pts.filter((q) => q.n === maxN).map((q) => q.sum));
+    // le posizioni quasi ottime formano gruppi: scelgo il più vicino a dove ero e ne prendo il centro
+    const good = pts.filter((q) => q.n === maxN && q.sum >= top * 0.97);
     const groups = []; let cur = null;
-    for (const q of pts) { if (q.sc === top) { if (cur && q.x - cur.to <= 16) cur.to = q.x; else { cur = { from: q.x, to: q.x }; groups.push(cur); } } }
+    for (const q of good) { if (cur && q.x - cur.to <= 6) cur.to = q.x; else { cur = { from: q.x, to: q.x }; groups.push(cur); } }
     groups.sort((g1, g2) => Math.abs((g1.from + g1.to) / 2 - r.x) - Math.abs((g2.from + g2.to) / 2 - r.x));
-    const best = { x: Math.round((groups[0].from + groups[0].to) / 2) };
-    const dx = best.x - r.x;
+    const nx = Math.round((groups[0].from + groups[0].to) / 2), dx = nx - r.x;
     if (!dx) return { cfg, dx: 0 };
     const out = { ...cfg };
-    for (const k of SHIFT_KEYS) if (cfg[k]) { const nx = cfg[k].x + dx; if (nx >= 0 && nx + cfg[k].width <= imgW) out[k] = { ...cfg[k], x: nx }; }   // se uscirebbe dallo schermo lascio com'era
+    for (const k of SHIFT_KEYS) if (cfg[k]) { const x2 = cfg[k].x + dx; if (x2 >= 0 && x2 + cfg[k].width <= imgW) out[k] = { ...cfg[k], x: x2 }; }
     return { cfg: out, dx };
   } catch (e) { return { cfg, dx: 0 }; }
 }

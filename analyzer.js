@@ -54,6 +54,23 @@ function findLabels(buf, width, height, hues) {
   return result;
 }
 
+// Quanto è "solida" l'etichetta di ogni colore dentro la finestra: per ogni candidata (fascia di righe) la quota di pixel del colore
+// nel rettangolo. Un'etichetta vera della colonna dei prezzi è un blocco pieno (alta); linee tratteggiate, bordi dei riquadri
+// degli ordini e puntini sono sottili o piccoli (bassa). Serve a ritrovare la colonna quando si sposta.
+function labelCoverage(buf, width, height, hues) {
+  const L = findLabels(buf, width, height, hues), tests = testsFor(hues), out = {};
+  for (const name of Object.keys(tests)) {
+    out[name] = 0;
+    if (!L[name]) continue;
+    for (const g of L[name].all) {
+      let c = 0;
+      for (let y = g.y0; y <= g.y1; y++) for (let x = 0; x < width; x++) { const i = (y * width + x) * 4; if (tests[name](buf[i + 2], buf[i + 1], buf[i])) c++; }
+      out[name] = Math.max(out[name], c / (width * (g.y1 - g.y0 + 1)));
+    }
+  }
+  return out;
+}
+
 // Riquadro dell'ordine a sinistra dell'etichetta (es. "8 | -496.00 USD | x"):
 // cerco il suo bordo colorato nelle righe appena sopra l'etichetta. buf = striscia a sinistra dell'asse.
 // per ogni colonna: il riquadro colorato dell'etichetta c'è? Guardo le righe appena sopra e appena sotto il testo
@@ -236,7 +253,7 @@ function direction(v) {
   return null;
 }
 
-module.exports = { findLabels, findOrderBox, labelSpan, decimalsOf, pickPrices, parseContracts, parseBoxMoney, parseBalance, reconcileMoney, parseNumber, direction, hueOf, DEFAULT_HUES };
+module.exports = { labelCoverage, findLabels, findOrderBox, labelSpan, decimalsOf, pickPrices, parseContracts, parseBoxMoney, parseBalance, reconcileMoney, parseNumber, direction, hueOf, DEFAULT_HUES };
 
 // ---------- data e ora del replay (FX Replay, in inglese) ----------
 const MONTHS = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12 };
