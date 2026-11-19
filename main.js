@@ -1140,17 +1140,40 @@ async function closeTrade(outcome, tradeId = null) {
   if (quickCloseOk(cd)) saveQuick(cd); else openConfirm(cd);
 }
 
+// Conto alla rovescia prima di fotografare lo schermo: serve il tempo di mettere il mouse sul grafico (la data sotto il grafico compare solo lì).
+// È una finestrella che non prende il focus, così il mouse resta dove lo metti; sparisce prima dello scatto.
+async function countdownNotice(display, seconds, title) {
+  const b = display.bounds, w = 560, h = 120;
+  const win = new BrowserWindow({
+    x: Math.round(b.x + (b.width - w) / 2), y: b.y + 50, width: w, height: h, frame: false, resizable: false, movable: false, minimizable: false, maximizable: false,
+    focusable: false, skipTaskbar: true, alwaysOnTop: true, show: false, hasShadow: true, backgroundColor: '#1c1f26',
+  });
+  win.setAlwaysOnTop(true, 'screen-saver');
+  win.setIgnoreMouseEvents(true);                      // il mouse "passa attraverso": il grafico sotto lo riceve come sempre
+  const html = `<!doctype html><meta charset="utf-8"><body style="margin:0;background:#1c1f26;color:#e6e8ec;font:15px/1.4 'Segoe UI',system-ui,sans-serif;display:flex;align-items:center;gap:18px;padding:0 24px;height:100vh;box-sizing:border-box;border:2px solid #2f6bff;overflow:hidden"><div id="n" style="font:700 44px 'Segoe UI',system-ui;color:#8fb0ff;min-width:56px;text-align:center">${seconds}</div><div><b style="font-size:17px">${title}</b><br>Metti il <b>mouse sul grafico</b> (così sotto il grafico compare la data) e lascialo fermo.</div></body>`;
+  try {
+    await win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
+    win.showInactive();
+    for (let n = seconds; n > 0; n--) {
+      status(`Calibrazione: fotografo lo schermo tra ${n}…`);
+      if (!win.isDestroyed()) win.webContents.executeJavaScript(`document.getElementById('n').textContent='${n}'`).catch(() => {});
+      await sleep(1000);
+    }
+  } finally { if (!win.isDestroyed()) win.close(); }
+  await sleep(250);                                     // il tempo che la finestrella sparisca davvero dallo schermo
+}
+
 async function openCalibration(layout = 'normal', hintDisplay = null) {
   if (layout === 'full') {
     const r = await dialog.showMessageBox({ type: 'info', buttons: ['Parti (10 secondi)', 'Annulla'], defaultId: 0, cancelId: 1, message: 'Calibrazione a schermo intero',
-      detail: 'Dopo aver premuto "Parti" hai 10 secondi per:\n\n1. Mettere la piattaforma a schermo intero (di solito il tasto F11).\n2. Avere un trade aperto, con TP e SL ben visibili sul grafico.\n\nAllo scadere fotografo lo schermo così com\'è. La barra resta in primo piano e mostra il conto alla rovescia.' });
+      detail: 'Dopo aver premuto "Parti" hai 10 secondi per:\n\n1. Mettere la piattaforma a schermo intero (di solito il tasto F11).\n2. Avere un trade aperto, con TP e SL ben visibili sul grafico.\n3. Mettere il mouse sul grafico (così compare la data).\n\nAllo scadere fotografo lo schermo così com\'è. Una finestrella mostra il conto alla rovescia.' });
     if (r.response !== 0) return;
-    for (let n = 10; n > 0; n--) { status(`Schermo intero: calibro tra ${n}…`); await sleep(1000); }
   }
   layoutNow = layout === 'full' ? 'full' : 'normal';
-  status('Preparo la calibrazione…');
   // si calibra lo schermo dove si trova la barra: è lo stesso che la barra fotografa quando registri un trade (non quello salvato la volta scorsa)
   const disp = alive(toolbar) ? screen.getDisplayMatching(toolbar.getBounds()) : (hintDisplay || screen.getPrimaryDisplay());
+  await countdownNotice(disp, layout === 'full' ? 10 : 6, layout === 'full' ? 'Schermo intero: calibro tra poco' : 'Sto per fotografare lo schermo');
+  status('Preparo la calibrazione…');
   const { img, displayId } = await capture(disp.id);
   calib = { img, displayId, layout: layoutNow };
   if (alive(calibWin)) calibWin.close();
