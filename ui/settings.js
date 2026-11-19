@@ -125,6 +125,7 @@ $('calibrateFull').onclick = () => api.settingsCalibrate('full');
 $('layoutMode').addEventListener('change', async (e) => fillPlatforms(await api.settingsLayoutMode(e.target.value)));
 
 // ----- barra -----
+$('quickSave').addEventListener('change', (e) => api.settingsQuick(e.target.checked));
 document.querySelectorAll('input[name="mode"]').forEach((r) => r.addEventListener('change', (e) => api.settingsMode(e.target.value)));
 
 api.settingsGet().then((d) => {
@@ -132,6 +133,7 @@ api.settingsGet().then((d) => {
   renderKeys();
   fillPlatforms(d);
   document.querySelector(`input[name="mode"][value="${d.mode}"]`).checked = true;
+  $('quickSave').checked = !!d.quickSave;
   if (d.accounts) { $('linked').hidden = false; fillAccounts(d.accounts, d.accountId); if (!d.accountId) accMsg('Scegli un conto dalla tendina.', 'err'); }
   else $('notLinked').hidden = false;
 });

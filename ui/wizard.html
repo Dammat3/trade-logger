@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="it"><head><meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="wizard.css">
+</head>
+<body>
+  <div class="dots" id="dots"></div>
+  <main>
+    <section data-step="0">
+      <h1>Benvenuto in Trade Logger 👋</h1>
+      <p>In pochi minuti prepariamo tutto, passo dopo passo. Poi per registrare un trade ti basterà premere un tasto.</p>
+      <p class="muted">Funziona con FX Replay e TradeSea, ma anche con qualsiasi altra piattaforma di trading: basta insegnargli dove leggere i numeri.</p>
+      <p class="muted small">Prima di continuare apri la tua piattaforma di trading e metti sul grafico un trade aperto (con entrata, take profit e stop loss visibili).</p>
+    </section>
+
+    <section data-step="1" hidden>
+      <h1>1 · Quale piattaforma usi?</h1>
+      <p>Scegli quella che usi di solito. Se non c'è nell'elenco, creala.</p>
+      <select id="platform" aria-label="Piattaforma"></select>
+      <button id="showNewPl">Non c'è: aggiungi una piattaforma</button>
+      <div id="newPlBox" hidden>
+        <label for="newPlName">Nome della piattaforma</label>
+        <input id="newPlName" placeholder="Es. TradingView">
+        <div class="row end"><button id="cancelPl">Annulla</button><button id="createPl" class="primary">Aggiungi</button></div>
+      </div>
+      <p class="msg" id="plMsg" role="status"></p>
+    </section>
+
+    <section data-step="2" hidden>
+      <h1>2 · Insegna dove leggere i numeri</h1>
+      <p>Con il grafico e il trade aperto sullo schermo, premi il bottone qui sotto. Questa finestra sparirà e ti verrà chiesto di disegnare un rettangolo sopra ciascun numero (prezzo, saldo…). Ti guida lui, passo passo.</p>
+      <button id="calibrate" class="primary big">Calibra ora</button>
+      <p class="msg" id="calMsg" role="status"></p>
+      <button id="testRead">Prova la lettura</button>
+      <div id="testOut" class="out" hidden></div>
+      <p class="muted small">Puoi anche saltare e farlo più tardi dalle Impostazioni.</p>
+    </section>
+
+    <section data-step="3" hidden>
+      <h1>3 · Scegli i tasti</h1>
+      <p>Con questi tasti registri i trade senza toccare il mouse.</p>
+      <label class="opt"><input type="radio" name="keys" value="simple" checked>
+        <span><b>Tasti semplici (consigliato)</b><br><span class="muted">F1 apre il trade · F2 chiude a Take Profit · F3 chiude a Stop Loss · F4 chiude a mano</span></span></label>
+      <label class="opt"><input type="radio" name="keys" value="default">
+        <span><b>Combinazioni con Ctrl+Alt</b><br><span class="muted">Più difficili da premere per sbaglio. Le trovi nelle Impostazioni.</span></span></label>
+      <p class="msg" id="keyMsg" role="status"></p>
+      <p class="muted small">Potrai cambiarli quando vuoi, anche con un tasto a tua scelta.</p>
+    </section>
+
+    <section data-step="4" hidden>
+      <h1>4 · Come vuoi la barra?</h1>
+      <label class="opt"><input type="radio" name="mode" value="minimal">
+        <span><b>Minimale</b><br><span class="muted">Una piccola striscia, quasi invisibile.</span></span></label>
+      <label class="opt"><input type="radio" name="mode" value="estesa" checked>
+        <span><b>Estesa</b><br><span class="muted">Con bottoni grandi da cliccare.</span></span></label>
+      <label class="opt"><input type="radio" name="mode" value="tasti">
+        <span><b>Solo tasti</b><br><span class="muted">Nessuna barra: usi solo la tastiera.</span></span></label>
+      <label class="opt check"><input type="checkbox" id="quickSave" checked>
+        <span><b>Salva subito se è tutto chiaro</b><br><span class="muted">Se la lettura è sicura il trade viene salvato senza finestra di conferma. Se qualcosa non torna, te lo chiede.</span></span></label>
+    </section>
+
+    <section data-step="5" hidden>
+      <h1>Tutto pronto ✅</h1>
+      <p>Apri un trade con il tasto che hai scelto e guarda in basso: la barra ti dice cosa sta succedendo.</p>
+      <p class="muted">Ti faccio un breve giro della barra? Dura un minuto.</p>
+    </section>
+  </main>
+  <footer>
+    <button id="skip" class="ghost">Salta</button>
+    <span class="grow"></span>
+    <button id="back">Indietro</button>
+    <button id="next" class="primary">Avanti</button>
+  </footer>
+  <script src="wizard.js"></script>
+</body></html>

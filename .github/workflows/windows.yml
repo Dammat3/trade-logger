@@ -1,6 +1,10 @@
 name: Build Windows
+# Si pubblica DA SOLO: basta fare Commit + Push su main.
+# Se hai alzato il numero di versione (package.json e/o package.journal.json) esce una nuova release.
+# Se la versione è la stessa di una release già uscita, non fa niente.
 on:
   push:
+    branches: [main]
     tags: ['v*']
   workflow_dispatch:
 permissions:
@@ -12,13 +16,29 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: 20 }
+      - name: Calcolo il nome della release
+        id: ver
+        shell: bash
+        run: |
+          B=$(node -p "require('./package.json').version")
+          J=$(node -p "require('./package.journal.json').version")
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then TAG="${GITHUB_REF#refs/tags/}"; NEW=true
+          else
+            TAG="v${B}-j${J}"
+            if git ls-remote --tags origin "refs/tags/$TAG" | grep -q .; then NEW=false; else NEW=true; fi
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "new=$NEW" >> "$GITHUB_OUTPUT"
+          echo "Release: $TAG (nuova: $NEW)"
       - name: Trade Logger
+        if: steps.ver.outputs.new == 'true'
         shell: bash
         run: |
           npm install
           npx electron-builder --win nsis
           mkdir out && cp dist/Trade-Logger-Setup-*.exe dist/Trade-Logger-Setup-*.exe.blockmap dist/latest.yml out/
       - name: Journal
+        if: steps.ver.outputs.new == 'true'
         shell: bash
         run: |
           rm -rf dist && cp package.json package.bar.json && cp package.journal.json package.json
@@ -26,7 +46,11 @@ jobs:
           npx electron-builder --win nsis
           cp dist/Journal-Setup-*.exe dist/Journal-Setup-*.exe.blockmap dist/journal.yml out/
       - uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/tags/')
-        with: { files: out/* }
+        if: steps.ver.outputs.new == 'true'
+        with:
+          tag_name: ${{ steps.ver.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          files: out/*
       - uses: actions/upload-artifact@v4
+        if: steps.ver.outputs.new == 'true'
         with: { name: windows-app, path: out/* }

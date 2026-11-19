@@ -1,0 +1,18 @@
+html,body{height:100%;margin:0}
+body{display:flex;flex-direction:column;padding:0 28px}
+.dots{display:flex;gap:8px;justify-content:center;padding:22px 0 6px}
+.dots i{width:9px;height:9px;border-radius:50%;background:#3a3f4b}
+.dots i.on{background:#4f8cff}
+.dots i.done{background:#2f9e6a}
+main{flex:1;overflow:auto;padding:8px 2px}
+h1{font-size:22px;margin:10px 0 14px}
+p{line-height:1.5}
+select,input[type=text],input:not([type]){width:100%;box-sizing:border-box;margin:6px 0}
+button.big{font-size:16px;padding:12px 22px;margin:10px 0}
+.opt{display:flex;gap:12px;align-items:flex-start;padding:12px 14px;margin:10px 0;border:1px solid #3a3f4b;border-radius:10px;cursor:pointer}
+.opt input{margin-top:4px}
+.out{margin-top:10px}
+.out .row{display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #2a2e38}
+footer{display:flex;gap:10px;align-items:center;padding:14px 0 20px;border-top:1px solid #2a2e38}
+.grow{flex:1}
+.ghost{background:transparent;border:0;color:#8b93a4}

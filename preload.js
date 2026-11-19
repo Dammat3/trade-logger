@@ -18,6 +18,7 @@ contextBridge.exposeInMainWorld('api', {
   settingsGet: () => ipcRenderer.invoke('settings:get'),
   settingsPauseKeys: () => ipcRenderer.invoke('settings:pause-keys'),
   settingsSaveKeys: (k) => ipcRenderer.invoke('settings:save-keys', k),
+  settingsQuick: (on) => ipcRenderer.invoke('settings:quicksave', on),
   settingsMode: (m) => ipcRenderer.invoke('settings:mode', m),
   settingsAccount: (id) => ipcRenderer.invoke('settings:account', id),
   settingsCreateAccount: (d) => ipcRenderer.invoke('settings:create-account', d),
@@ -40,6 +41,8 @@ contextBridge.exposeInMainWorld('api', {
   settingsLayoutMode: (mode) => ipcRenderer.invoke('settings:layout-mode', mode),
   promptDone: (v) => ipcRenderer.invoke('prompt:done', v),
   openLocal: () => ipcRenderer.invoke('toolbar:local'),
+  // configurazione guidata
+  wizardFinish: (t) => ipcRenderer.invoke('wizard:finish', t),
   // tutorial
   tourGet: () => ipcRenderer.invoke('tour:get'),
   tourRect: (ids) => ipcRenderer.invoke('tour:rect', ids),

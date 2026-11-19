@@ -800,7 +800,7 @@ function platformList() {
 }
 ipcMain.handle('settings:get', async () => {
   const c = getConfig();
-  return { keys: getKeys(), defaults: DEFAULT_KEYS, mode: barModeOf(c), accountId: (activeAccount() || {}).id || '', ...platformList(), ...accountsInfo() };
+  return { keys: getKeys(), defaults: DEFAULT_KEYS, mode: barModeOf(c), quickSave: !!c.quickSave, accountId: (activeAccount() || {}).id || '', ...platformList(), ...accountsInfo() };
 });
 ipcMain.handle('settings:platform', (_e, id) => { switchPlatform(id); return platformList(); });
 function createPlatform(name) {
@@ -824,15 +824,17 @@ ipcMain.handle('settings:layout-mode', (_e, mode) => {
 ipcMain.handle('settings:calibrate', async (_e, layout) => {
   // nascondo le Impostazioni, altrimenti finirebbero nello screenshot sopra il grafico
   if (alive(settingsWin)) settingsWin.hide();
+  if (alive(wizardWin)) wizardWin.hide();
+  const back = () => { if (alive(settingsWin)) settingsWin.show(); if (alive(wizardWin)) { wizardWin.show(); wizardWin.webContents.send('wizard:refresh'); } };
   await guarded(() => openCalibration(layout === 'full' ? 'full' : 'normal'));
-  if (alive(calibWin)) calibWin.once('closed', () => { if (alive(settingsWin)) settingsWin.show(); });
-  else if (alive(settingsWin)) settingsWin.show();
+  if (alive(calibWin)) calibWin.once('closed', back); else back();
 });
 // "Prova la lettura": nasconde le impostazioni, aspetta 4 secondi (tu metti in vista il grafico), legge e mostra cosa ha capito. Non salva nulla.
 ipcMain.handle('settings:test-read', async () => {
   let cfg = getConfig();
   if (!isCalibrated()) throw new Error('Prima serve la calibrazione: premi "Calibra".');
   if (alive(settingsWin)) settingsWin.hide();
+  if (alive(wizardWin)) wizardWin.hide();
   try {
     await sleep(4000);
     const { img } = await capture();
@@ -843,7 +845,7 @@ ipcMain.handle('settings:test-read', async () => {
     try { when = await tradeWhen(img, cfg) || {}; } catch {}
     const sz = img.getSize();
     return { layout: lay.info.note || '', size: `${sz.width}×${sz.height}`, entry: v.entry, tp: v.tp, sl: v.sl, symbol: v.symbol || null, balance: v.balance === undefined ? null : v.balance, date: when.tradeDate || null, time: when.tradeTime || null, hint: priceHint(v, v.symbol || cfg.lastSymbol || '') || '' };
-  } finally { if (alive(settingsWin)) { settingsWin.show(); settingsWin.focus(); } }
+  } finally { if (alive(settingsWin)) { settingsWin.show(); settingsWin.focus(); } if (alive(wizardWin)) { wizardWin.show(); wizardWin.focus(); } }
 });
 ipcMain.handle('settings:pause-keys', () => { globalShortcut.unregisterAll(); });   // mentre registri una scorciatoia
 ipcMain.handle('settings:save-keys', (_e, keys) => {
@@ -1050,8 +1052,9 @@ async function newTrade() {
   const when = await tradeWhen(img, cfg);
   const dv = curValues();
   const sym = v.symbol || cfg.lastSymbol || '';
-  openConfirm({ mode: 'open', shot, ...v, symbol: sym, symbolRead: !!v.symbol, priceHint: priceHint(v, sym), layoutNote: [lay.info.note, calibNote].filter(Boolean).join(' '), setup: dv.setup, tags: dv.tags, note: dv.note, ...when,
-    backtest: activeKind() === 'backtest' });
+  const od = { mode: 'open', shot, ...v, symbol: sym, symbolRead: !!v.symbol, priceHint: priceHint(v, sym), layoutNote: [lay.info.note, calibNote].filter(Boolean).join(' '), setup: dv.setup, tags: dv.tags, note: dv.note, ...when,
+    backtest: activeKind() === 'backtest' };
+  if (quickOpenOk(od)) saveQuick(od); else openConfirm(od);
 }
 
 async function closeTrade(outcome, tradeId = null) {
@@ -1081,7 +1084,8 @@ async function closeTrade(outcome, tradeId = null) {
     else pnlHint += 'Saldo non letto: scrivi il risultato a mano.';
   }
   status('Controlla i dati');
-  openConfirm({ mode: 'close', tradeId: trade.id, outcome, shot, balanceAfter: balance, pnl, pnlHint, trade, layoutNote: lay.info.note });
+  const cd = { mode: 'close', tradeId: trade.id, outcome, shot, balanceAfter: balance, pnl, pnlHint, trade, layoutNote: lay.info.note };
+  if (quickCloseOk(cd)) saveQuick(cd); else openConfirm(cd);
 }
 
 async function openCalibration(layout = 'normal') {
@@ -1106,6 +1110,29 @@ async function openCalibration(layout = 'normal') {
   calibWin.once('ready-to-show', () => { calibWin.maximize(); calibWin.show(); });
   status('Pronto');
 }
+
+
+// ---------- salvataggio rapido: se tutto è stato letto bene non serve la finestra di conferma ----------
+const quickOn = () => !!getConfig().quickSave;
+const nz = (x) => x !== null && x !== undefined && x !== '';
+function quickOpenOk(d) {
+  return quickOn() && nz(d.symbol) && (d.direction === 'LONG' || d.direction === 'SHORT') && nz(d.entry) && nz(d.tp) && nz(d.sl) && nz(d.balance)
+    && !d.priceHint && !d.moneyCheck && !d.dateHint && nz(d.tradeDate) && (d.backtest ? nz(d.tradeTime) : true);
+}
+function quickCloseOk(d) { return quickOn() && nz(d.balanceAfter) && nz(d.pnl) && !d.pnlHint; }
+function saveQuick(data) {
+  pending = data;
+  if (data.mode === 'open') {
+    applyConfirm({ mode: 'open', symbol: data.symbol, direction: data.direction, entry: data.entry, sl: data.sl, tp: data.tp, contracts: data.contracts,
+      balanceBefore: data.balance, note: data.note || '', tpUsd: data.tpUsd, slUsd: data.slUsd, tradeDate: data.tradeDate, tradeTime: data.tradeTime, setup: data.setup || '' });
+    status(`Salvato: ${data.symbol} ${data.direction} ✓`);
+  } else {
+    applyConfirm({ mode: 'close', tradeId: data.tradeId, outcome: data.outcome, balanceAfter: data.balanceAfter, pnl: data.pnl, note: '' });
+    status(`Chiuso: ${data.outcome} ${data.pnl >= 0 ? '+' : ''}${data.pnl} ✓`);
+  }
+  setTimeout(() => status('Pronto'), 4000);
+}
+ipcMain.handle('settings:quicksave', (_e, on) => { const c = getConfig(); c.quickSave = !!on; saveConfig(c); return !!on; });
 
 function openConfirm(data) {
   data.setups = [...lists.setups];
@@ -1152,6 +1179,24 @@ function createToolbar() {
   toolbar.webContents.on('did-finish-load', refreshToolbar);
   toolbar.on('closed', () => app.quit());
 }
+
+// ---------- configurazione guidata (primo avvio) ----------
+let wizardWin = null;
+function openWizard() {
+  if (alive(wizardWin)) { wizardWin.show(); wizardWin.focus(); return; }
+  wizardWin = new BrowserWindow({
+    width: 600, height: 740, backgroundColor: '#14161b', title: 'Configurazione guidata',
+    icon: path.join(__dirname, 'build', 'icon.png'), webPreferences: { preload: path.join(__dirname, 'preload.js') },
+  });
+  wizardWin.setMenuBarVisibility(false);
+  wizardWin.loadFile('ui/wizard.html');
+  wizardWin.on('closed', () => { wizardWin = null; const c = getConfig(); if (!c.wizardDone) { c.wizardDone = true; saveConfig(c); } registerShortcuts(); });
+}
+ipcMain.handle('wizard:finish', (_e, withTour) => {
+  const c = getConfig(); c.wizardDone = true; saveConfig(c);
+  if (alive(wizardWin)) wizardWin.close();
+  if (withTour) setTimeout(startTour, 400);
+});
 
 // ---------- tutorial guidato ----------
 // Una finestra trasparente a tutto schermo (sullo schermo della barra) scurisce tutto e lascia in luce il pezzo spiegato.
@@ -1285,6 +1330,7 @@ ipcMain.handle('toolbar:menu', () => {
     { label: `Piattaforma: ${pname}`, submenu: platformMenu() },
     { type: 'separator' },
     { label: 'Impostazioni…', click: () => openSettings() },
+    { label: 'Configurazione guidata…', click: () => openWizard() },
     { label: 'Tutorial…', click: () => startTour() },
     { type: 'separator' },
     { label: 'Apri il Journal', click: () => openJournalApp() },
@@ -1355,7 +1401,7 @@ ipcMain.handle('app:quit', () => app.quit());
 
 ipcMain.handle('confirm:get', () => pending);
 ipcMain.handle('confirm:cancel', () => { pending = null; if (alive(confirmWin)) confirmWin.close(); });
-ipcMain.handle('confirm:save', (_e, d) => {
+function applyConfirm(d) {
   const num = (x) => parseNumber(x);
   if (d.mode === 'open') {
     const t = {
@@ -1409,7 +1455,8 @@ ipcMain.handle('confirm:save', (_e, d) => {
   if (alive(confirmWin)) confirmWin.close();
   syncAll();
   return true;
-});
+}
+ipcMain.handle('confirm:save', (_e, d) => applyConfirm(d));
 
 ipcMain.handle('calib:get', () => { if (!calib) return null; layoutNow = calib.layout || 'normal'; const c = getConfig(); return { image: calib.img.toDataURL(), current: c, platform: ((c.platforms[c.activePlatform] || {}).name || '') + (layoutNow === 'full' ? ' (schermo intero)' : '') }; });
 ipcMain.handle('calib:save', async (_e, rects) => {
@@ -1538,7 +1585,11 @@ app.whenReady().then(() => {
   setTimeout(() => updater.check({ silent: true }), 20000);   // controllo in silenzio, solo se hai indicato dove cercare
   { const c0 = getConfig(); if (c0.tourPrevMode !== undefined) { c0.barMode = c0.tourPrevMode; delete c0.tourPrevMode; saveConfig(c0); } }   // chiuso a metà tutorial: la barra torna com'era
   createToolbar();
-  if (!getConfig().tourDone) setTimeout(startTour, 2500);   // la prima volta il giro parte da solo
+  setTimeout(() => {              // primo avvio: configurazione guidata e poi il giro; chi ha già una piattaforma calibrata va diretto al giro
+    const c = getConfig();
+    if (!c.wizardDone && !platformList().platforms.some((p) => p.calibrated)) openWizard();
+    else { if (!c.wizardDone) { c.wizardDone = true; saveConfig(c); } if (!c.tourDone) startTour(); }
+  }, 2500);
   getWorker().catch((e) => console.error('OCR non pronto:', e)); // prepara l'OCR in anticipo
   setTimeout(syncAll, 3000);                 // invia eventuali trade rimasti indietro
   setTimeout(() => pushSetups().then(refreshLists), 4000);          // consegna al database i setup creati finora solo sul PC
