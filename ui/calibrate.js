@@ -46,8 +46,10 @@ function offerAuto() {
 }
 function startManual() { plan = steps; step = 0; autoOffer = null; done.innerHTML = ''; rects = { hues: {} }; showStep(); }
 async function runAuto() {
-  btns([]); $('msg').innerHTML = '<b>Cerco…</b> ci vogliono alcuni secondi.';
-  const r = await api.calibAuto();
+  btns([]); wrap.style.cursor = 'wait'; $('redo').disabled = true;
+  const t0 = Date.now(), tick = () => { $('msg').innerHTML = `<div class="busy"><span class="spin" aria-hidden="true"></span><div><b>Sto leggendo lo schermo…</b><br><span class="muted">${Math.round((Date.now() - t0) / 1000)} secondi — di solito ne bastano circa 6. Non toccare niente.</span></div></div><div class="bar"><i></i></div>`; };
+  tick(); const timer = setInterval(tick, 1000);
+  let r; try { r = await api.calibAuto(); } finally { clearInterval(timer); wrap.style.cursor = 'default'; $('redo').disabled = false; }
   if (!r) { offerAuto(); return; }
   autoOffer = r; done.innerHTML = '';
   const k = img.naturalWidth / img.clientWidth;

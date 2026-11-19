@@ -26,3 +26,11 @@ html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: 
 
 .found { margin: 8px 0; padding: 0; list-style: none; display: grid; gap: 3px; }
 .neg { color: #ff8a8a; }
+
+.busy { display: flex; gap: 14px; align-items: center; }
+.spin { flex: none; width: 26px; height: 26px; border-radius: 50%; border: 3px solid #2a2e38; border-top-color: #2f6bff; animation: spin .8s linear infinite; }
+.bar { height: 4px; border-radius: 4px; background: #2a2e38; margin-top: 12px; overflow: hidden; position: relative; }
+.bar i { position: absolute; top: 0; bottom: 0; width: 35%; background: #2f6bff; border-radius: 4px; animation: slide 1.2s ease-in-out infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes slide { 0% { left: -35%; } 100% { left: 100%; } }
+@media (prefers-reduced-motion: reduce) { .spin, .bar i { animation-duration: 3s; } }

@@ -1,5 +1,7 @@
 // Elenco delle novità, dalla più recente. Per ogni nuova versione aggiungi una voce in cima.
 window.NOVITA = [
+  { v: '0.14.1', titolo: 'Calibrazione automatica: si vede che sta lavorando', righe: [
+    ['Nuovo', 'Mentre legge lo schermo compare una rotellina con i secondi che passano, così si capisce che non è bloccata.'] ] },
   { v: '0.14.0', titolo: 'Calibrazione automatica', righe: [
     ['Nuovo', 'Premi "Calibra in automatico": la barra trova da sola la colonna dei prezzi, il saldo, l\'orologio del replay e la riga della data. Ti mostra i riquadri trovati e tu confermi. Serve un trade aperto con TP e SL visibili.'],
     ['Nuovo', 'Se qualcosa non viene trovato, completi a mano solo quello che manca, oppure disegni tutto come prima.'] ] },
