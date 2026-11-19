@@ -1,5 +1,7 @@
 // Elenco delle novità, dalla più recente. Per ogni nuova versione aggiungi una voce in cima.
 window.NOVITA = [
+  { v: '0.15.1', titolo: 'Versione per Mac', righe: [
+    ['Nuovo', 'Ogni release ora include anche i file per Mac (Trade Logger e Journal, per chip Apple e Intel). Su Mac non è firmata: la prima volta si apre con clic destro, Apri, e la barra chiede il permesso di Registrazione schermo. Gli aggiornamenti su Mac non sono automatici: si scarica la versione nuova.'] ] },
   { v: '0.15.0', titolo: 'Tutorial aggiornato', righe: [
     ['Nuovo', 'Il giro guidato nella barra ora spiega anche il salvataggio rapido, la configurazione guidata, la calibrazione automatica, le finestre affiancate, le impostazioni Base/Avanzate e gli aggiornamenti.'] ] },
   { v: '0.14.9', titolo: 'Installer unico', righe: [

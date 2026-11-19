@@ -12,6 +12,9 @@ permissions:
 jobs:
   win:
     runs-on: windows-latest
+    outputs:
+      tag: ${{ steps.ver.outputs.tag }}
+      new: ${{ steps.ver.outputs.new }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -71,3 +74,32 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: steps.ver.outputs.new == 'true'
         with: { name: windows-app, path: out/* }
+
+  # Versione per Mac: parte dopo quella Windows, solo quando esce una release nuova, e aggiunge i file alla stessa release.
+  # Se dovesse fallire, la release Windows resta com'è.
+  mac:
+    needs: win
+    if: needs.win.outputs.new == 'true'
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - name: Trade Logger (Mac)
+        shell: bash
+        run: |
+          npm install
+          npx electron-builder --mac dmg zip --publish never
+          mkdir out && cp dist/*.dmg dist/*.zip out/
+      - name: Journal (Mac)
+        shell: bash
+        run: |
+          rm -rf dist && cp package.json package.bar.json && cp package.journal.json package.json
+          npm install
+          npx electron-builder --mac dmg zip --publish never
+          cp dist/*.dmg dist/*.zip out/
+          ls -la out
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.win.outputs.tag }}
+          files: out/*
