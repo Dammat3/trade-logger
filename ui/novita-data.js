@@ -1,5 +1,7 @@
 // Elenco delle novità, dalla più recente. Per ogni nuova versione aggiungi una voce in cima.
 window.NOVITA = [
+  { v: '0.14.9', titolo: 'Installer unico', righe: [
+    ['Nuovo', 'Da questa versione, tra i file della release c\'è anche Trade-Logger-Journal-Setup.exe: un solo file che installa insieme barra e Journal e imposta già gli aggiornamenti automatici.'] ] },
   { v: '0.14.8', titolo: 'Impostazioni più semplici', righe: [
     ['Nuovo', 'Le impostazioni mostrano in alto solo l\'essenziale (conto, piattaforma e calibrazione, barra, conferma dei trade). Layout, scorciatoie, cartella screenshot, aggiornamenti e condivisione locale sono nella sezione "Avanzate", che resta aperta o chiusa come l\'hai lasciata.'] ] },
   { v: '0.14.7', titolo: 'Finestre affiancate più precise', righe: [

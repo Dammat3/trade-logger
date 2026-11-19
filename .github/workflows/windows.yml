@@ -45,6 +45,23 @@ jobs:
           npm install
           npx electron-builder --win nsis
           cp dist/Journal-Setup-*.exe dist/Journal-Setup-*.exe.blockmap dist/journal.yml out/
+      - name: Installer unico (barra + Journal)
+        if: steps.ver.outputs.new == 'true'
+        continue-on-error: true      # se questo passaggio dovesse fallire, le due app escono lo stesso
+        shell: bash
+        run: |
+          export MSYS_NO_PATHCONV=1
+          if ! command -v makensis >/dev/null 2>&1; then
+            choco install nsis -y --no-progress
+            export PATH="$PATH:/c/Program Files (x86)/NSIS"
+          fi
+          W() { cygpath -w "$(realpath "$1")"; }
+          BAR=$(W "$(ls out/Trade-Logger-Setup-*.exe | head -1)")
+          JOU=$(W "$(ls out/Journal-Setup-*.exe | head -1)")
+          OUT="$(W out)\\Trade-Logger-Journal-Setup.exe"
+          URL="https://github.com/${{ github.repository }}/releases/latest/download"
+          makensis -V2 "-DBAR=$BAR" "-DJOURNAL=$JOU" "-DOUT=$OUT" "-DURL=$URL" "-DVER=${{ steps.ver.outputs.tag }}" build/suite.nsi
+          ls -la out
       - uses: softprops/action-gh-release@v2
         if: steps.ver.outputs.new == 'true'
         with:
