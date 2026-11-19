@@ -1,5 +1,8 @@
 // Elenco delle novità, dalla più recente. Per ogni nuova versione aggiungi una voce in cima.
 window.NOVITA = [
+  { v: '0.15.2', titolo: 'Mac: un solo file e anche Intel', righe: [
+    ['Nuovo', 'Per Mac c\'è un unico file (Trade-Logger-Journal-Mac-arm64.dmg per i chip Apple, Trade-Logger-Journal-Mac-x64.dmg per i Mac Intel): lo apri e trascini le due app nella cartella Applicazioni.'],
+    ['Corretto', 'Nella release mancavano i file per i Mac Intel: ora ci sono.'] ] },
   { v: '0.15.1', titolo: 'Versione per Mac', righe: [
     ['Nuovo', 'Ogni release ora include anche i file per Mac (Trade Logger e Journal, per chip Apple e Intel). Su Mac non è firmata: la prima volta si apre con clic destro, Apri, e la barra chiede il permesso di Registrazione schermo. Gli aggiornamenti su Mac non sono automatici: si scarica la versione nuova.'] ] },
   { v: '0.15.0', titolo: 'Tutorial aggiornato', righe: [

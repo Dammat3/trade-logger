@@ -89,15 +89,29 @@ jobs:
         shell: bash
         run: |
           npm install
-          npx electron-builder --mac dmg zip --publish never
-          mkdir out && cp dist/*.dmg dist/*.zip out/
+          npx electron-builder --mac dmg zip --arm64 --x64 --publish never
+          mkdir out
+          cp dist/*.dmg dist/*.zip out/
+          # copio le due app (Apple e Intel) per l'installer unico
+          mkdir -p stage/arm64 stage/x64
+          for a in dist/mac-arm64/*.app; do ditto "$a" "stage/arm64/$(basename "$a")"; done
+          for a in dist/mac/*.app; do ditto "$a" "stage/x64/$(basename "$a")"; done
       - name: Journal (Mac)
         shell: bash
         run: |
           rm -rf dist && cp package.json package.bar.json && cp package.journal.json package.json
           npm install
-          npx electron-builder --mac dmg zip --publish never
+          npx electron-builder --mac dmg zip --arm64 --x64 --publish never
           cp dist/*.dmg dist/*.zip out/
+          for a in dist/mac-arm64/*.app; do ditto "$a" "stage/arm64/$(basename "$a")"; done
+          for a in dist/mac/*.app; do ditto "$a" "stage/x64/$(basename "$a")"; done
+      - name: Installer unico per Mac (barra + Journal)
+        shell: bash
+        run: |
+          for arch in arm64 x64; do
+            ln -s /Applications "stage/$arch/Applications"
+            hdiutil create -volname "Trade Logger + Journal" -srcfolder "stage/$arch" -ov -format UDZO "out/Trade-Logger-Journal-Mac-$arch.dmg"
+          done
           ls -la out
       - uses: softprops/action-gh-release@v2
         with:
