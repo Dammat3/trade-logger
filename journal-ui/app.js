@@ -884,10 +884,107 @@ async function loadUrls(trades) {
   try { Object.assign(D.urls, await S.db.imageUrls(paths)); } catch (e) { toast('Non riesco a caricare le immagini: ' + errMsg(e), true); }
 }
 
-async function openDay(day, focusId) {
+// =====================================================================
+//  Vista a colpo d'occhio di un trade: screenshot grandi, dati, setup, tag e note in una sola finestra, senza scorrere.
+//  Frecce ai lati per passare da un trade all'altro dello stesso giorno. "Modifica" apre la finestra di modifica.
+// =====================================================================
+let V = null;   // stato della vista aperta: { day, id, urls, el }
+const outcomeLabel = (t) => (t.status === 'aperto' ? 'Aperto' : ({ TP: 'Take profit', SL: 'Stop loss', MANUALE: 'Chiuso a mano' }[t.outcome] || ''));
+const vTrades = () => S.trades.filter((t) => t.trade_date === V.day);
+const vnum = (x) => (x == null ? '' : String(x).replace('.', ','));
+
+async function openDay(day, focusId) {            // punto d'ingresso unico: chi apre un giorno vede prima la vista, la modifica è un passo in più
+  closeMenus();
+  if (V) closeTradeView();
+  if (D) await closeDay();
+  if (S.trades.some((t) => t.trade_date === day)) return openTradeView(day, focusId);
+  return openDayEdit(day, focusId);               // giorno vuoto: si parte dalla finestra di modifica per aggiungere un trade
+}
+
+function tradeViewHTML() {
+  const list = vTrades(), n = list.length, i = Math.max(0, list.findIndex((t) => t.id === V.id)), t = list[i];
+  const imgs = t.trade_images, shown = imgs.slice(0, 4), more = imgs.length - shown.length;
+  const date = parseYmd(V.day).toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  const r = rOf(t), oc = outcomeLabel(t);
+  const row = (k, v) => (v === '' || v == null ? '' : `<div class="tv-kv"><span>${k}</span><b>${esc(v)}</b></div>`);
+  const prices = [row('Ingresso', vnum(t.entry)), row('Stop loss', vnum(t.sl)), row('Take profit', vnum(t.tp)), row('Contratti', vnum(t.contracts)),
+    S.money ? row('Valore TP', t.tp_usd != null ? moneyPlain(t.tp_usd) : '') : '', S.money ? row('Valore SL', t.sl_usd != null ? moneyPlain(t.sl_usd) : '') : ''].join('');
+  const chips = (arr, extra = '') => (arr.length ? arr.map((x) => `<span class="chip on ${extra}">${esc(x)}</span>`).join('') : '<span class="muted small">—</span>');
+  return `<button class="tv-arrow prev" data-tvmove="-1" aria-label="Trade precedente" ${n > 1 ? '' : 'hidden'}>‹</button>
+  <button class="tv-arrow next" data-tvmove="1" aria-label="Trade successivo" ${n > 1 ? '' : 'hidden'}>›</button>
+  <div class="tv-win" role="dialog" aria-modal="true" aria-label="Trade">
+    <div class="tv-head">
+      <div class="tv-title"><b>${esc(date)}</b><span class="muted">Trade ${i + 1} di ${n}${t.status === 'aperto' ? ' · aperto' : ''}${t.source === 'trade-logger' ? ' · da Trade Logger' : ''}</span></div>
+      <span class="grow"></span>
+      <button class="btn primary" data-tvedit>✎ Modifica</button>
+      <button class="btn ghost icon" data-tvclose aria-label="Chiudi">✕</button>
+    </div>
+    <div class="tv-main">
+      <div class="tv-shots n${Math.max(1, shown.length)}">
+        ${shown.length ? shown.map((im) => `<figure class="tv-shot"><img src="${esc(V.urls[im.path] || '')}" alt="${esc(im.timeframe || 'Screenshot')}" data-tvimg="${esc(im.id)}">${im.timeframe ? `<figcaption>${esc(im.timeframe)}</figcaption>` : ''}</figure>`).join('')
+          : '<div class="tv-noshot"><span>📷</span>Nessuno screenshot per questo trade.<br><span class="muted small">Premi Modifica per aggiungerne.</span></div>'}
+        ${more > 0 ? `<button class="tv-more" data-tvimg="${esc(imgs[4].id)}">+${more} altre</button>` : ''}
+      </div>
+      <aside class="tv-side">
+        <div class="tv-result">
+          <div class="tv-pnl ${t.status === 'aperto' ? '' : cls(t.pnl)}">${t.status === 'aperto' ? 'Aperto' : money(t.pnl)}</div>
+          <div class="tv-pills">${oc && t.status !== 'aperto' ? `<span class="pill ${esc(t.outcome || '')}">${esc(oc)}</span>` : ''}${r != null ? `<span class="rchip ${cls(r)}">${fmtR(r)}</span>` : ''}${t.starred ? '<span class="tv-star" title="Preferito">★</span>' : ''}</div>
+        </div>
+        <div class="tv-line"><b>${esc(t.symbol || '—')}</b>${t.direction ? `<span class="dir ${t.direction === 'LONG' ? 'long' : 'short'}">${t.direction === 'LONG' ? 'Long' : 'Short'}</span>` : ''}<span class="muted">${esc(t.trade_time || '')}</span></div>
+        ${prices ? `<div class="tv-kvs">${prices}</div>` : ''}
+        <div class="tv-sec"><div class="sec-t">Setup</div>${t.setup ? `<span class="chip on">${esc(t.setup)}</span>` : '<span class="muted small">—</span>'}</div>
+        <div class="tv-sec"><div class="sec-t">Tag</div><div class="chips">${chips(t.tags)}</div></div>
+        ${t.emotions.length ? `<div class="tv-sec"><div class="sec-t">Emozioni</div><div class="chips">${chips(t.emotions, 'emo')}</div></div>` : ''}
+        <div class="tv-sec tv-notes"><div class="sec-t">Note</div>${t.notes ? `<p>${esc(t.notes)}</p>` : '<p class="muted">Nessuna nota. Premi Modifica per scriverne una.</p>'}</div>
+      </aside>
+    </div>
+  </div>`;
+}
+function renderTradeView() { V.el.innerHTML = tradeViewHTML(); }
+async function openTradeView(day, focusId) {
+  const list = S.trades.filter((t) => t.trade_date === day); if (!list.length) return openDayEdit(day, focusId);
+  if (V) closeTradeView();
+  V = { day, id: (list.find((t) => t.id === focusId) || list[0]).id, urls: {}, el: null };
+  const ov = document.createElement('div'); ov.className = 'overlay tv'; ov.id = 'tvOverlay'; V.el = ov;
+  document.body.appendChild(ov); document.body.style.overflow = 'hidden';
+  document.addEventListener('keydown', onTvKey);
+  ov.addEventListener('mousedown', (e) => { if (e.target === ov) closeTradeView(); });
+  ov.addEventListener('click', (e) => {
+    const b = e.target.closest('button, img[data-tvimg]'); if (!b) return;
+    if (b.matches('[data-tvclose]')) return closeTradeView();
+    if (b.matches('[data-tvmove]')) return tvMove(Number(b.dataset.tvmove));
+    if (b.matches('[data-tvedit]')) return tvEdit();
+    if (b.dataset.tvimg) { const t = tradeById(V.id); if (t) openViewer(t, b.dataset.tvimg); }
+  });
+  const paths = list.flatMap((t) => (t.trade_images || []).map((x) => x.path)).filter(Boolean);
+  renderTradeView();
+  if (paths.length) {
+    try { Object.assign(V.urls, await S.db.imageUrls(paths)); } catch (e) { toast('Non riesco a caricare le immagini: ' + errMsg(e), true); }
+    if (V && V.el === ov) renderTradeView();
+  }
+}
+function tvMove(k) {
+  const list = vTrades(); if (list.length < 2) return;
+  const i = list.findIndex((t) => t.id === V.id);
+  V.id = list[(i + k + list.length) % list.length].id; renderTradeView();
+}
+function tvEdit() { const day = V.day, id = V.id; closeTradeView(); openDayEdit(day, id, true); }
+function closeTradeView() {
+  if (!V) return;
+  V.el.remove(); document.body.style.overflow = ''; document.removeEventListener('keydown', onTvKey); V = null;
+}
+function onTvKey(e) {
+  if (!V || $('.viewer') || $('.modal.small') || e.target.closest?.('input, textarea, select')) return;
+  if (e.key === 'Escape') closeTradeView();
+  else if (e.key === 'ArrowLeft') tvMove(-1);
+  else if (e.key === 'ArrowRight') tvMove(1);
+  else if (e.key === 'e' || e.key === 'E') tvEdit();
+}
+
+async function openDayEdit(day, focusId, back = false) {
   closeMenus();
   if (D) await closeDay();
-  D = { day, active: focusId || null, timers: {}, urls: {} };
+  D = { day, active: focusId || null, timers: {}, urls: {}, back };
   const ov = document.createElement('div');
   ov.className = 'overlay'; ov.id = 'dayOverlay';
   ov.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-labelledby="dayTitle">
@@ -915,10 +1012,12 @@ async function closeDay() {
   const pending = Object.keys(D.timers);
   await Promise.all(pending.map(flushTrade));
   if (D.noteValue !== undefined) await flushNote();
+  const back = D.back ? { day: D.day, id: D.active } : null;
   D.el.remove(); document.body.style.overflow = ''; D = null;
   document.removeEventListener('paste', onPaste);
   document.removeEventListener('keydown', onDayKey);
   renderPage();
+  if (back && S.trades.some((t) => t.trade_date === back.day)) openTradeView(back.day, back.id);   // finita la modifica si torna alla vista a colpo d'occhio
 }
 
 async function addTrade() {
@@ -985,7 +1084,7 @@ function openViewer(t, imgId) {
   const v = document.createElement('div'); v.className = 'viewer'; v.setAttribute('role', 'dialog'); v.setAttribute('aria-label', 'Immagine');
   const show = () => {
     const img = t.trade_images[i];
-    v.innerHTML = `<img src="${esc(D.urls[img.path] || '')}" alt="${esc(img.timeframe || 'Screenshot')}">
+    v.innerHTML = `<img src="${esc(((D && D.urls) || (V && V.urls) || {})[img.path] || '')}" alt="${esc(img.timeframe || 'Screenshot')}">
       <div class="cap">${esc(img.timeframe || '')}${t.trade_images.length > 1 ? ` (${i + 1} di ${t.trade_images.length})` : ''}</div>
       ${t.trade_images.length > 1 ? '<button class="prev" aria-label="Precedente">‹</button><button class="next" aria-label="Successiva">›</button>' : ''}
       <button class="x" aria-label="Chiudi">✕</button>`;
