@@ -919,24 +919,26 @@ function tradeViewHTML() {
       <button class="btn primary" data-tvedit>✎ Modifica</button>
       <button class="btn ghost icon" data-tvclose aria-label="Chiudi">✕</button>
     </div>
-    <div class="tv-main">
-      <div class="tv-shots n${Math.max(1, shown.length)}">
-        ${shown.length ? shown.map((im) => `<figure class="tv-shot"><img src="${esc(V.urls[im.path] || '')}" alt="${esc(im.timeframe || 'Screenshot')}" data-tvimg="${esc(im.id)}">${im.timeframe ? `<figcaption>${esc(im.timeframe)}</figcaption>` : ''}</figure>`).join('')
-          : '<div class="tv-noshot"><span>📷</span>Nessuno screenshot per questo trade.<br><span class="muted small">Premi Modifica per aggiungerne.</span></div>'}
-        ${more > 0 ? `<button class="tv-more" data-tvimg="${esc(imgs[4].id)}">+${more} altre</button>` : ''}
-      </div>
-      <aside class="tv-side">
+    <div class="tv-info">
+      <div class="tv-row">
         <div class="tv-result">
           <div class="tv-pnl ${t.status === 'aperto' ? '' : cls(t.pnl)}">${t.status === 'aperto' ? 'Aperto' : money(t.pnl)}</div>
           <div class="tv-pills">${oc && t.status !== 'aperto' ? `<span class="pill ${esc(t.outcome || '')}">${esc(oc)}</span>` : ''}${r != null ? `<span class="rchip ${cls(r)}">${fmtR(r)}</span>` : ''}${t.starred ? '<span class="tv-star" title="Preferito">★</span>' : ''}</div>
         </div>
         <div class="tv-line"><b>${esc(t.symbol || '—')}</b>${t.direction ? `<span class="dir ${t.direction === 'LONG' ? 'long' : 'short'}">${t.direction === 'LONG' ? 'Long' : 'Short'}</span>` : ''}<span class="muted">${esc(t.trade_time || '')}</span></div>
         ${prices ? `<div class="tv-kvs">${prices}</div>` : ''}
+      </div>
+      <div class="tv-row tv-row2">
         <div class="tv-sec"><div class="sec-t">Setup</div>${t.setup ? `<span class="chip on">${esc(t.setup)}</span>` : '<span class="muted small">—</span>'}</div>
         <div class="tv-sec"><div class="sec-t">Tag</div><div class="chips">${chips(t.tags)}</div></div>
         ${t.emotions.length ? `<div class="tv-sec"><div class="sec-t">Emozioni</div><div class="chips">${chips(t.emotions, 'emo')}</div></div>` : ''}
         <div class="tv-sec tv-notes"><div class="sec-t">Note</div>${t.notes ? `<p>${esc(t.notes)}</p>` : '<p class="muted">Nessuna nota. Premi Modifica per scriverne una.</p>'}</div>
-      </aside>
+      </div>
+    </div>
+    <div class="tv-shots n${Math.max(1, shown.length)}">
+      ${shown.length ? shown.map((im) => `<figure class="tv-shot"><img src="${esc(V.urls[im.path] || '')}" alt="${esc(im.timeframe || 'Screenshot')}" data-tvimg="${esc(im.id)}">${im.timeframe ? `<figcaption>${esc(im.timeframe)}</figcaption>` : ''}</figure>`).join('')
+        : '<div class="tv-noshot"><span>📷</span>Nessuno screenshot per questo trade.<br><span class="muted small">Premi Modifica per aggiungerne.</span></div>'}
+      ${more > 0 ? `<button class="tv-more" data-tvimg="${esc(imgs[4].id)}">+${more} altre</button>` : ''}
     </div>
   </div>`;
 }
