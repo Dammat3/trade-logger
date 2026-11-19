@@ -1,8 +1,9 @@
 // Elenco delle novità, dalla più recente. Per ogni nuova versione aggiungi una voce in cima.
 window.NOVITA = [
-  { v: '0.14.3', titolo: 'Calibrazione più sicura', righe: [
+  { v: '0.14.4', titolo: 'Calibrazione più sicura', righe: [
     ['Corretto', 'La finestra di calibrazione non va più a schermo intero vero (su alcuni PC copriva tutto e non si poteva cliccare): ora è una normale finestra ingrandita, con la barra del titolo.'],
     ['Nuovo', 'Premendo Esc si chiude sempre la calibrazione.'],
+    ['Corretto', 'Con più monitor la calibrazione fotografa lo schermo dove si trova la barra (lo stesso che legge quando registri un trade), non quello salvato la volta scorsa, e la finestra si apre su quello.'],
     ['Corretto', 'Lo screenshot nella calibrazione si adatta alla finestra anche se questa cambia misura appena si apre.'] ] },
   { v: '0.14.1', titolo: 'Calibrazione automatica: si vede che sta lavorando', righe: [
     ['Nuovo', 'Mentre legge lo schermo compare una rotellina con i secondi che passano, così si capisce che non è bloccata.'] ] },

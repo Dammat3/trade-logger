@@ -871,11 +871,14 @@ ipcMain.handle('settings:layout-mode', (_e, mode) => {
   return platformList();
 });
 ipcMain.handle('settings:calibrate', async (_e, layout) => {
+  // lo schermo da calibrare è quello dove stai lavorando adesso: dove si trovano le Impostazioni (o la configurazione guidata)
+  const here = alive(settingsWin) && settingsWin.isVisible() ? settingsWin : (alive(wizardWin) && wizardWin.isVisible() ? wizardWin : null);
+  const hint = here ? screen.getDisplayMatching(here.getBounds()) : null;
   // nascondo le Impostazioni, altrimenti finirebbero nello screenshot sopra il grafico
   if (alive(settingsWin)) settingsWin.hide();
   if (alive(wizardWin)) wizardWin.hide();
   const back = () => { if (alive(settingsWin)) settingsWin.show(); if (alive(wizardWin)) { wizardWin.show(); wizardWin.webContents.send('wizard:refresh'); } };
-  await guarded(() => openCalibration(layout === 'full' ? 'full' : 'normal'));
+  await guarded(() => openCalibration(layout === 'full' ? 'full' : 'normal', hint));
   if (alive(calibWin)) calibWin.once('closed', back); else back();
 });
 // "Prova la lettura": nasconde le impostazioni, aspetta 4 secondi (tu metti in vista il grafico), legge e mostra cosa ha capito. Non salva nulla.
@@ -1137,7 +1140,7 @@ async function closeTrade(outcome, tradeId = null) {
   if (quickCloseOk(cd)) saveQuick(cd); else openConfirm(cd);
 }
 
-async function openCalibration(layout = 'normal') {
+async function openCalibration(layout = 'normal', hintDisplay = null) {
   if (layout === 'full') {
     const r = await dialog.showMessageBox({ type: 'info', buttons: ['Parti (10 secondi)', 'Annulla'], defaultId: 0, cancelId: 1, message: 'Calibrazione a schermo intero',
       detail: 'Dopo aver premuto "Parti" hai 10 secondi per:\n\n1. Mettere la piattaforma a schermo intero (di solito il tasto F11).\n2. Avere un trade aperto, con TP e SL ben visibili sul grafico.\n\nAllo scadere fotografo lo schermo così com\'è. La barra resta in primo piano e mostra il conto alla rovescia.' });
@@ -1145,13 +1148,14 @@ async function openCalibration(layout = 'normal') {
     for (let n = 10; n > 0; n--) { status(`Schermo intero: calibro tra ${n}…`); await sleep(1000); }
   }
   layoutNow = layout === 'full' ? 'full' : 'normal';
-  const cfg = getConfig();
   status('Preparo la calibrazione…');
-  const { img, displayId } = await capture(cfg.displayId);
+  // si calibra lo schermo dove si trova la barra: è lo stesso che la barra fotografa quando registri un trade (non quello salvato la volta scorsa)
+  const disp = alive(toolbar) ? screen.getDisplayMatching(toolbar.getBounds()) : (hintDisplay || screen.getPrimaryDisplay());
+  const { img, displayId } = await capture(disp.id);
   calib = { img, displayId, layout: layoutNow };
   if (alive(calibWin)) calibWin.close();
   calibWin = new BrowserWindow({
-    width: 1200, height: 800, show: false, backgroundColor: '#000000', title: 'Calibrazione', autoHideMenuBar: true,
+    x: disp.bounds.x + 40, y: disp.bounds.y + 40, width: 1200, height: 800, show: false, backgroundColor: '#000000', title: 'Calibrazione', autoHideMenuBar: true,
     icon: path.join(__dirname, 'build', 'icon.png'), webPreferences: { preload: path.join(__dirname, 'preload.js') },
   });
   calibWin.setMenuBarVisibility(false);
