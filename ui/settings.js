@@ -184,3 +184,10 @@ $('updCheck').onclick = async () => {
   catch (e) { updMsg(cleanErr(e), 'err'); }
   $('updCheck').disabled = false;
 };
+
+// "Avanzate": ricorda se l'hai lasciata aperta
+(() => {
+  const d = document.getElementById('advAll'); if (!d) return;
+  try { if (localStorage.getItem('settings-adv-open') === '1') d.open = true; } catch (e) { /* senza memoria: resta chiusa */ }
+  d.addEventListener('toggle', () => { try { localStorage.setItem('settings-adv-open', d.open ? '1' : '0'); } catch (e) { /* niente */ } });
+})();

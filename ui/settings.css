@@ -47,3 +47,11 @@ input.short { width: 120px; }
 textarea { font-family: inherit; }
 .btns.top { margin-top: 14px; }
 section > label { margin-top: 14px; }
+
+details.advall > summary { cursor: pointer; list-style: none; display: flex; align-items: center; gap: 10px; }
+details.advall > summary::-webkit-details-marker { display: none; }
+details.advall > summary::before { content: '▸'; color: var(--muted); font-size: 12px; }
+details.advall[open] > summary::before { content: '▾'; }
+details.advall[open] > summary { margin-bottom: 4px; }
+details.advall .inner { background: var(--bg); }
+details.advall .inner .newbox { background: var(--panel); }

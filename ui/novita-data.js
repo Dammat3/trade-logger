@@ -1,5 +1,7 @@
 // Elenco delle novità, dalla più recente. Per ogni nuova versione aggiungi una voce in cima.
 window.NOVITA = [
+  { v: '0.14.8', titolo: 'Impostazioni più semplici', righe: [
+    ['Nuovo', 'Le impostazioni mostrano in alto solo l\'essenziale (conto, piattaforma e calibrazione, barra, conferma dei trade). Layout, scorciatoie, cartella screenshot, aggiornamenti e condivisione locale sono nella sezione "Avanzate", che resta aperta o chiusa come l\'hai lasciata.'] ] },
   { v: '0.14.7', titolo: 'Finestre affiancate più precise', righe: [
     ['Corretto', 'Se una cifra di TP o SL viene letta male (es. 9 al posto di 5) ma l\'importo in dollari non torna, il programma ricava il prezzo giusto dall\'importo, lo corregge e ti avvisa di controllare.'],
     ['Corretto', 'Con le finestre ridimensionate la data del replay viene cercata anche nell\'etichetta colorata sotto il grafico, ovunque si sia spostata.'] ] },
