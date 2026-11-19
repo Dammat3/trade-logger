@@ -1,5 +1,8 @@
 // Elenco delle novità, dalla più recente. Per ogni nuova versione aggiungi una voce in cima.
 window.NOVITA = [
+  { v: '0.14.2', titolo: 'Calibrazione più sicura', righe: [
+    ['Corretto', 'La finestra di calibrazione non va più a schermo intero vero (su alcuni PC copriva tutto e non si poteva cliccare): ora è una normale finestra ingrandita, con la barra del titolo.'],
+    ['Nuovo', 'Premendo Esc si chiude sempre la calibrazione.'] ] },
   { v: '0.14.1', titolo: 'Calibrazione automatica: si vede che sta lavorando', righe: [
     ['Nuovo', 'Mentre legge lo schermo compare una rotellina con i secondi che passano, così si capisce che non è bloccata.'] ] },
   { v: '0.14.0', titolo: 'Calibrazione automatica', righe: [

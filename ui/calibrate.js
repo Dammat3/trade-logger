@@ -151,6 +151,8 @@ window.addEventListener('mouseup', (e) => {
   next();
 });
 
+// Esc chiude la calibrazione (sempre una via d'uscita)
+addEventListener('keydown', (e) => { if (e.key === 'Escape' && !start) api.closeCalibration(); });
 $('skip').onclick = () => next();
 $('auto').onclick = runAuto;
 $('manual').onclick = startManual;
