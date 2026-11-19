@@ -1,18 +1,20 @@
 // Aggiornamenti automatici (usato da Trade Logger e da Journal).
-// L'indirizzo dove cercare le nuove versioni sta in Documenti\TradeLogger\aggiornamenti.json ({"url": "..."}):
-// se non c'è, non succede niente. Senza firma digitale Windows lo permette lo stesso (installazione per utente).
+// L'indirizzo dove cercare le nuove versioni è già dentro il programma (DEFAULT_URL: la pagina delle release su GitHub).
+// Si può cambiare scrivendo Documenti\\TradeLogger\\aggiornamenti.json ({"url": "..."}) o dalle Impostazioni di Trade Logger. Senza firma digitale Windows lo permette lo stesso (installazione per utente).
 const fs = require('fs');
 const path = require('path');
+
+const DEFAULT_URL = 'https://github.com/Dammat3/trade-logger/releases/latest/download';
 
 function create({ app, dialog, dataDir, name, channel }) {
   let autoUpdater = null, busy = false;
   const file = () => path.join(dataDir(), 'aggiornamenti.json');
-  const getUrl = () => { try { return String(JSON.parse(fs.readFileSync(file(), 'utf8')).url || '').trim(); } catch { return ''; } };
+  const getUrl = () => { try { const u = String(JSON.parse(fs.readFileSync(file(), 'utf8')).url || '').trim(); if (u) return u; } catch { /* nessun indirizzo scelto */ } return DEFAULT_URL; };
   const setUrl = (url) => {
     url = String(url || '').trim();
     if (url && !/^https:\/\/[^\s]+$/.test(url)) throw new Error('L\'indirizzo deve iniziare con https://');
     fs.mkdirSync(dataDir(), { recursive: true });
-    fs.writeFileSync(file(), JSON.stringify({ url: url.replace(/\/+$/, '') }, null, 2));
+    fs.writeFileSync(file(), JSON.stringify({ url: url.replace(/\/+$/, '') === DEFAULT_URL ? '' : url.replace(/\/+$/, '') }, null, 2));
     return getUrl();
   };
   function init() {

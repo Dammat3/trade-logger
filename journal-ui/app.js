@@ -1707,7 +1707,7 @@ function renderSettings() {
     ${S.local ? `<section class="card"><div class="card-head"><h2>Aggiornamenti</h2></div>
       <div class="pad-box"><label class="field"><span>Versione del Journal installata</span><input class="input" readonly value="${esc((S.localInfo && S.localInfo.version) || 'sconosciuta')}"></label>
         <button class="btn primary" data-act="upd-check">Cerca aggiornamenti</button>
-        <p class="muted small" style="margin:8px 0 0">Il Journal controlla da solo all'avvio. L'indirizzo degli aggiornamenti si imposta una volta sola nelle impostazioni di Trade Logger.</p></div></section>` : ''}
+        <p class="muted small" style="margin:8px 0 0">Il Journal controlla da solo all'avvio se c'è una versione nuova: non devi impostare nient'altro.</p></div></section>` : ''}
     ${S.local ? localCard() : ''}
     <section class="card"><div class="card-head"><h2>Conti e backtest</h2><div class="grow"></div><button class="btn" data-act="newacc">+ Nuovo</button></div>
       <div class="table-wrap"><table><thead><tr><th>Nome</th><th>Tipo</th><th></th></tr></thead><tbody>
