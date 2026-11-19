@@ -20,14 +20,14 @@
     { page: 'settings', sel: () => card('Dati sul tuo PC'), title: 'I tuoi dati', text: 'Tutto è salvato in cartelle sul tuo PC. Da qui apri le cartelle, scegli dove tenere gli screenshot e crei una copia di sicurezza. Una copia automatica viene fatta anche una volta al giorno.', side: 'top' },
     { page: 'settings', sel: () => card('Conti e backtest'), title: 'Conti e backtest', text: 'Crea un nuovo conto con <b>+ Nuovo</b>, rinominalo o eliminalo. Eliminare cancella per sempre i suoi trade, per questo ti chiede conferma.', side: 'top' },
     { page: 'settings', sel: () => card('Setup'), title: 'Setup e tag', text: 'Le liste che compaiono quando registri un trade. Puoi aggiungerne, rinominarli (si cambiano su tutti i trade) o nasconderli. Vedi anche quanti trade usano ciascuno.', side: 'top' },
-    { title: 'Il resto lo fa Trade Logger', text: 'I trade arrivano dalla barra di <b>Trade Logger</b> mentre operi su FX Replay o TradeSea: il Journal li mostra qui da solo. Puoi rifare questo giro quando vuoi dal pulsante <b>? Tutorial</b> nel menu a sinistra.' },
+    { title: 'Il resto lo fa Trade Logger', text: 'I trade arrivano dalla barra di <b>Trade Logger</b> mentre operi: funziona con FX Replay e TradeSea, le piattaforme principali, ma anche con qualsiasi altra piattaforma di trading. Il Journal li mostra qui da solo. Puoi rifare questo giro quando vuoi dal pulsante <b>? Tutorial</b> nel menu a sinistra.' },
   ];
   let i = 0, ui = null, active = false, dir = 1;
 
   const mk = (tag, cls) => { const e = document.createElement(tag); if (cls) e.className = cls; return e; };
   function build() {
     ui = { wrap: mk('div', 'tour'), block: mk('div', 'tour-block'), hl: mk('div', 'tour-hl'), tip: mk('div', 'tour-tip') };
-    ui.tip.setAttribute('role', 'dialog'); ui.tip.setAttribute('aria-live', 'polite');
+    ui.tip.setAttribute('aria-live', 'polite');
     ui.tip.innerHTML = '<div class="tour-step"></div><h3></h3><p></p><div class="tour-btns"><button type="button" class="btn ghost" data-t="skip">Salta</button><span class="grow"></span><button type="button" class="btn" data-t="back">Indietro</button><button type="button" class="btn primary" data-t="next">Avanti</button></div>';
     ui.wrap.append(ui.block, ui.hl, ui.tip);
     document.body.appendChild(ui.wrap);
@@ -92,16 +92,26 @@
     else if (e.key === 'ArrowRight' || e.key === 'Enter') { e.preventDefault(); go(i + 1); }
     else if (e.key === 'ArrowLeft') { e.preventDefault(); go(i - 1); }
   }
+  // durante il giro la pagina non scorre: né con la rotella, né col tocco, né con la tastiera
+  const stopScroll = (e) => { if (active) e.preventDefault(); };
+  const SCROLL_KEYS = [' ', 'PageUp', 'PageDown', 'Home', 'End', 'ArrowUp', 'ArrowDown'];
+  function onKeyLock(e) { if (active && SCROLL_KEYS.includes(e.key) && !(e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName))) e.preventDefault(); }
+  function lock(on) {
+    const f = on ? 'addEventListener' : 'removeEventListener';
+    document[f]('wheel', stopScroll, { passive: false, capture: true });
+    document[f]('touchmove', stopScroll, { passive: false, capture: true });
+    document[f]('keydown', onKeyLock, true);
+  }
   function onResize() { if (active) go(i); }
   function start() {
     if (active) return;
     if (typeof S === 'undefined' || !S.accountId) return;
-    active = true; build();
+    active = true; build(); lock(true);
     document.addEventListener('keydown', onKey, true); window.addEventListener('resize', onResize);
     go(0);
   }
   function stop() {
-    active = false;
+    active = false; lock(false);
     document.removeEventListener('keydown', onKey, true); window.removeEventListener('resize', onResize);
     if (ui) ui.wrap.remove(); ui = null;
     try { localStorage.setItem(KEY, '1'); } catch { /* senza memoria si rivede ogni volta, pazienza */ }
