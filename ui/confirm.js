@@ -72,6 +72,7 @@ function renderOpen(p) {
       ${field('tp', 'Take profit', p.tp, 'price-tp')}
       ${field('sl', 'Stop loss', p.sl, 'price-sl')}
       ${p.priceHint ? `<div class="hint date-hint">${esc(p.priceHint)}</div>` : ''}
+      ${p.priceFixed ? `<div class="hint date-hint">Ho corretto ${p.priceFixed.field === 'sl' ? 'lo stop loss' : 'il take profit'} da ${esc(String(p.priceFixed.from))} a ${esc(String(p.priceFixed.to))}: una cifra non era leggibile e l'importo in dollari non tornava. Controlla sul grafico.</div>` : ''}
     </div>
     ${field('balanceBefore', 'Saldo all\'apertura', p.balance)}
     ${setupField(p.setup, p.setups)}

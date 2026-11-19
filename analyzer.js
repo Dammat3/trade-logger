@@ -187,10 +187,60 @@ function labelSpan(buf, width, y0, y1, name, hues) {
 const POINT_VALUES = [0.5, 1, 1.25, 2, 2.5, 5, 6.25, 10, 12.5, 20, 25, 50, 100];
 // valore di un punto per contratto dei future più comuni (se il simbolo è noto si usa questo)
 const SYMBOL_PV = { MNQ: 2, NQ: 20, MES: 5, ES: 50, MYM: 0.5, YM: 5, M2K: 5, RTY: 50, MGC: 10, GC: 100, MCL: 100, CL: 1000, SIL: 1000, SI: 5000, MBT: 0.1, FDXM: 5, FDAX: 25, FESX: 10 };
+
+// Se i prezzi e i valori in dollari non tornano tra loro, ma uno dei due prezzi è giusto (torna con il suo importo) e l'altro
+// differisce dal prezzo ricavato dall'importo per UNA sola cifra (es. 24949.5 letto 24945.5), correggo la cifra.
+// Serve quando le finestre sono piccole e l'OCR confonde 9 con 5, 8 con 6, ecc. Segno la correzione: la finestra si apre per il controllo.
+function fixPriceFromMoney(r, dTp, dSl) {
+  const pv = SYMBOL_PV[r.symbol], c = r.contracts;
+  if (!pv || !c || r.tpUsd == null || r.slUsd == null) return;
+  const aTp = Math.abs(r.tpUsd), aSl = Math.abs(r.slUsd);
+  if (!aTp || !aSl) return;
+  const okTp = Math.abs(aTp - dTp * pv * c) / aTp < 0.03, okSl = Math.abs(aSl - dSl * pv * c) / aSl < 0.03;
+  if (okTp === okSl) return;                                    // o tornano entrambi, o nessuno: non so quale correggere
+  const dec = Math.max(0, ...[r.tp, r.sl, r.entry].map((v) => (String(v).split('.')[1] || '').length));
+  const oneDigit = (a, b) => { const x = a.toFixed(dec), y = b.toFixed(dec); if (x.length !== y.length) return false; let d = 0; for (let i = 0; i < x.length; i++) if (x[i] !== y[i]) d++; return d === 1; };
+  const key = okTp ? 'sl' : 'tp', usd = okTp ? aSl : aTp, cur = r[key];
+  const sign = Math.sign(cur - r.entry) || 1;
+  const implied = Math.round((r.entry + sign * usd / (pv * c)) * Math.pow(10, dec)) / Math.pow(10, dec);
+  if (implied === cur || !oneDigit(cur, implied)) return;
+  r.priceFixed = { field: key, from: cur, to: implied };
+  r[key] = implied;
+}
+
+// Riquadri pieni sulla riga dell'asse del tempo (es. l'etichetta "Wed 15 Oct '25" del replay): fasce verticali di colore uniforme,
+// diverse dallo sfondo, larghe come un'etichetta. buf = pixel BGRA della fascia, width/height = dimensioni.
+// Restituisce [{x0, x1}] in coordinate della fascia.
+function findAxisBoxes(buf, width, height, minW = 60, maxW = 340) {
+  const q = (v) => v >> 4, key = (i) => (q(buf[i + 2]) << 8) | (q(buf[i + 1]) << 4) | q(buf[i]);
+  const all = new Map();
+  for (let i = 0; i < width * height * 4; i += 4 * 3) { const k = key(i); all.set(k, (all.get(k) || 0) + 1); }
+  const bgK = [...all.entries()].sort((a, b) => b[1] - a[1])[0][0];
+  const rgb = (k) => [((k >> 8) & 15) * 16 + 8, ((k >> 4) & 15) * 16 + 8, (k & 15) * 16 + 8];
+  const bg = rgb(bgK), dist = (a, b) => Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) + Math.abs(a[2] - b[2]);
+  const cols = [];
+  for (let x = 0; x < width; x++) {
+    const cnt = new Map();
+    for (let y = 0; y < height; y++) { const k = key((y * width + x) * 4); cnt.set(k, (cnt.get(k) || 0) + 1); }
+    const [k, n] = [...cnt.entries()].sort((a, b) => b[1] - a[1])[0];
+    const c = rgb(k);
+    cols.push(n / height >= 0.5 && dist(c, bg) > 40 ? c : null);
+  }
+  const boxes = []; let cur = null, gap = 0;
+  for (let x = 0; x <= width; x++) {
+    const c = x < width ? cols[x] : null;
+    if (c && cur && dist(c, cur.c) < 40) { cur.x1 = x; gap = 0; }
+    else if (c && !cur) { cur = { x0: x, x1: x, c }; gap = 0; }
+    else if (cur && ++gap > 3) { if (cur.x1 - cur.x0 + 1 >= minW && cur.x1 - cur.x0 + 1 <= maxW) boxes.push({ x0: cur.x0, x1: cur.x1 }); cur = c ? { x0: x, x1: x, c } : null; gap = 0; }
+  }
+  return boxes;
+}
 function reconcileMoney(r) {
   if (r.tp == null || r.sl == null || r.entry == null) return r;
-  const dTp = Math.abs(r.tp - r.entry), dSl = Math.abs(r.sl - r.entry);
+  let dTp = Math.abs(r.tp - r.entry), dSl = Math.abs(r.sl - r.entry);
   if (!dTp || !dSl) return r;
+  fixPriceFromMoney(r, dTp, dSl);
+  dTp = Math.abs(r.tp - r.entry); dSl = Math.abs(r.sl - r.entry);
   const ratio = dSl / dTp, round2 = (v) => Math.round(v * 100) / 100;
   const cands = (v) => (v == null ? [] : [v, v / 100, v / 10, v * 10, v * 100, v * 1000, v / 1000]);
   if (r.tpUsd != null && r.slUsd != null) {
@@ -253,7 +303,7 @@ function direction(v) {
   return null;
 }
 
-module.exports = { labelCoverage, findLabels, findOrderBox, labelSpan, decimalsOf, pickPrices, parseContracts, parseBoxMoney, parseBalance, reconcileMoney, parseNumber, direction, hueOf, DEFAULT_HUES };
+module.exports = { findAxisBoxes, labelCoverage, findLabels, findOrderBox, labelSpan, decimalsOf, pickPrices, parseContracts, parseBoxMoney, parseBalance, reconcileMoney, parseNumber, direction, hueOf, DEFAULT_HUES };
 
 // ---------- data e ora del replay (FX Replay, in inglese) ----------
 const MONTHS = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12 };

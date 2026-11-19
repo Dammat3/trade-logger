@@ -6,7 +6,7 @@ const { fetchEvents } = require('./newsfetch');
 const path = require('path');
 const fs = require('fs');
 const { createWorker } = require('tesseract.js');
-const { parseSymbolEx, parseReplayDateSmart } = require('./analyzer');
+const { parseSymbolEx, parseReplayDateSmart, findAxisBoxes } = require('./analyzer');
 const autocal = require('./autocal');
 const { labelCoverage, boxColumns, findLabels, findOrderBox, labelSpan, decimalsOf, pickPrices, parseContracts, parseBoxMoney, parseBalance, reconcileMoney, parseNumber, direction, parseReplayTime, parseReplayDate } = require('./analyzer');
 const { createClient } = require('@supabase/supabase-js');
@@ -771,6 +771,20 @@ async function readReplay(img, cfg, hintYear) {
       const wide = clampRect({ x: x0, y: r.y, width: x1 - x0, height: r.height }, img);
       if (wide.width > r.width) { const d2 = await readAxis(wide), p2 = parseReplayDateSmart(d2.text, { hintYear }); if (p2) { data = d2; pd = p2; } }
     }
+    if (!pd) {
+      // ultimo tentativo: cerco sulla riga dell'asse, su tutta la larghezza, i riquadri pieni (l'etichetta della data è un riquadro colorato)
+      // e leggo quelli, partendo dal più vicino alla colonna dei prezzi del grafico attivo
+      try {
+        const iw = img.getSize().width, band = clampRect({ x: 0, y: r.y, width: iw, height: r.height }, img), bm = img.crop(band);
+        const boxes = findAxisBoxes(bm.toBitmap(), band.width, band.height), px = cfg.priceRect ? cfg.priceRect.x : r.x;
+        boxes.sort((a, b) => Math.abs((a.x0 + a.x1) / 2 - px) - Math.abs((b.x0 + b.x1) / 2 - px));
+        for (const bx of boxes.slice(0, 4)) {
+          const rr = clampRect({ x: Math.max(0, bx.x0 - 4), y: band.y, width: bx.x1 - bx.x0 + 9, height: band.height }, img);
+          const d3 = await readAxis(rr), p3 = parseReplayDateSmart(d3.text, { hintYear });
+          if (p3) { data = d3; pd = p3; break; }
+        }
+      } catch (e) { /* resta il messaggio "data non visibile" */ }
+    }
     if (pd) { out.date = pd.date; out.dateRaw = pd.raw; out.dateConf = pd.conf; } else out.dateRaw = String(data.text || '').trim().slice(0, 60);
   }
   return out;
@@ -1196,7 +1210,7 @@ const quickOn = () => !!getConfig().quickSave;
 const nz = (x) => x !== null && x !== undefined && x !== '';
 function quickOpenOk(d) {
   return quickOn() && nz(d.symbol) && (d.direction === 'LONG' || d.direction === 'SHORT') && nz(d.entry) && nz(d.tp) && nz(d.sl) && nz(d.balance)
-    && !d.priceHint && !d.moneyCheck && !d.dateHint && nz(d.tradeDate) && (d.backtest ? nz(d.tradeTime) : true);
+    && !d.priceHint && !d.moneyCheck && !d.priceFixed && !d.dateHint && nz(d.tradeDate) && (d.backtest ? nz(d.tradeTime) : true);
 }
 function quickCloseOk(d) { return quickOn() && nz(d.balanceAfter) && nz(d.pnl) && !d.pnlHint; }
 function saveQuick(data) {
