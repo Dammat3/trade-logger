@@ -1153,6 +1153,48 @@ function createToolbar() {
   toolbar.on('closed', () => app.quit());
 }
 
+// ---------- tutorial guidato ----------
+// Una finestra trasparente a tutto schermo (sullo schermo della barra) scurisce tutto e lascia in luce il pezzo spiegato.
+let tourWin = null, tourBounds = null;
+function startTour() {
+  if (alive(tourWin)) { tourWin.focus(); return; }
+  if (!alive(toolbar)) return;
+  const c = getConfig();
+  if (c.tourPrevMode === undefined) c.tourPrevMode = barModeOf(c);   // il tutorial mostra la barra estesa; alla fine torna com'era
+  c.barMode = 'estesa'; saveConfig(c); refreshToolbar();
+  globalShortcut.unregisterAll();                                    // durante il giro le scorciatoie non devono registrare trade
+  const d = screen.getDisplayMatching(toolbar.getBounds());
+  tourBounds = d.bounds;
+  tourWin = new BrowserWindow({
+    x: d.bounds.x, y: d.bounds.y, width: d.bounds.width, height: d.bounds.height, frame: false, transparent: true,
+    backgroundColor: '#00000000', hasShadow: false, resizable: false, movable: false, minimizable: false, maximizable: false,
+    fullscreenable: false, skipTaskbar: true, alwaysOnTop: true, show: false, title: 'Tutorial',
+    webPreferences: { preload: path.join(__dirname, 'preload.js') },
+  });
+  tourWin.setAlwaysOnTop(true, 'screen-saver');
+  tourWin.setMenu(null);
+  tourWin.loadFile('ui/tour.html');
+  tourWin.once('ready-to-show', () => { if (alive(tourWin)) { tourWin.show(); tourWin.focus(); } });
+  tourWin.on('closed', endTour);
+}
+function endTour() {
+  tourWin = null;
+  const c = getConfig();
+  if (c.tourPrevMode !== undefined) { c.barMode = c.tourPrevMode; delete c.tourPrevMode; }
+  c.tourDone = true; saveConfig(c); refreshToolbar();
+  registerShortcuts();
+}
+ipcMain.handle('tour:get', () => ({ keys: getKeys() }));
+ipcMain.handle('tour:rect', async (_e, ids) => {
+  if (!alive(toolbar) || !tourBounds || !Array.isArray(ids)) return null;
+  const r = await toolbar.webContents.executeJavaScript(`(${JSON.stringify(ids)}).map((id) => { const e = document.getElementById(id); if (!e) return null; const r = e.getBoundingClientRect(); return r.width ? [r.left, r.top, r.right, r.bottom] : null; }).filter(Boolean)`).catch(() => []);
+  if (!r || !r.length) return null;
+  const b = toolbar.getBounds();
+  const l = Math.min(...r.map((x) => x[0])), t = Math.min(...r.map((x) => x[1])), rr = Math.max(...r.map((x) => x[2])), bb = Math.max(...r.map((x) => x[3]));
+  return { x: b.x + l - tourBounds.x, y: b.y + t - tourBounds.y, w: rr - l, h: bb - t };
+});
+ipcMain.handle('tour:close', () => { if (alive(tourWin)) tourWin.close(); });
+
 // ---------- spostamento della barra (trascinando la maniglia) ----------
 let dragStart = null;
 ipcMain.on('toolbar:drag-start', (_e, p) => { const [x, y] = toolbar.getPosition(); dragStart = { x, y, sx: p.x, sy: p.y }; });
@@ -1243,6 +1285,7 @@ ipcMain.handle('toolbar:menu', () => {
     { label: `Piattaforma: ${pname}`, submenu: platformMenu() },
     { type: 'separator' },
     { label: 'Impostazioni…', click: () => openSettings() },
+    { label: 'Tutorial…', click: () => startTour() },
     { type: 'separator' },
     { label: 'Apri il Journal', click: () => openJournalApp() },
     { label: 'Journal semplice (dentro la barra)', click: () => openJournal() },
@@ -1493,7 +1536,9 @@ app.whenReady().then(() => {
   ensureActiveAccount();
   updater = updaterLib.create({ app, dialog, dataDir: () => store.dataDir(), name: 'Trade Logger' });
   setTimeout(() => updater.check({ silent: true }), 20000);   // controllo in silenzio, solo se hai indicato dove cercare
+  { const c0 = getConfig(); if (c0.tourPrevMode !== undefined) { c0.barMode = c0.tourPrevMode; delete c0.tourPrevMode; saveConfig(c0); } }   // chiuso a metà tutorial: la barra torna com'era
   createToolbar();
+  if (!getConfig().tourDone) setTimeout(startTour, 2500);   // la prima volta il giro parte da solo
   getWorker().catch((e) => console.error('OCR non pronto:', e)); // prepara l'OCR in anticipo
   setTimeout(syncAll, 3000);                 // invia eventuali trade rimasti indietro
   setTimeout(() => pushSetups().then(refreshLists), 4000);          // consegna al database i setup creati finora solo sul PC

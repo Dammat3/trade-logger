@@ -40,6 +40,10 @@ contextBridge.exposeInMainWorld('api', {
   settingsLayoutMode: (mode) => ipcRenderer.invoke('settings:layout-mode', mode),
   promptDone: (v) => ipcRenderer.invoke('prompt:done', v),
   openLocal: () => ipcRenderer.invoke('toolbar:local'),
+  // tutorial
+  tourGet: () => ipcRenderer.invoke('tour:get'),
+  tourRect: (ids) => ipcRenderer.invoke('tour:rect', ids),
+  tourClose: () => ipcRenderer.invoke('tour:close'),
   // collegamento
   linkGet: () => ipcRenderer.invoke('link:get'),
   linkLogin: (d) => ipcRenderer.invoke('link:login', d),

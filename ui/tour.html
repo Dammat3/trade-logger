@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="it"><head><meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'">
+<link rel="stylesheet" href="tour.css">
+</head>
+<body>
+  <div id="hl" class="hl" hidden></div>
+  <div id="tip" class="tip" aria-live="polite">
+    <div class="step" id="step"></div>
+    <h3 id="title"></h3>
+    <p id="text"></p>
+    <div class="btns"><button id="skip" class="ghost">Salta</button><span class="grow"></span><button id="back">Indietro</button><button id="next" class="primary">Avanti</button></div>
+  </div>
+  <script src="tour.js"></script>
+</body></html>

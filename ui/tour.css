@@ -1,0 +1,16 @@
+html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: transparent; color: #e6e8ec; font: 14px/1.45 "Segoe UI", system-ui, sans-serif; user-select: none; }
+body.dim { background: rgba(6, 8, 12, .72); }
+.hl { position: fixed; border-radius: 9px; border: 2px solid #2f6bff; box-shadow: 0 0 0 9999px rgba(6, 8, 12, .72), 0 0 18px rgba(47, 107, 255, .7); pointer-events: none; transition: left .25s, top .25s, width .25s, height .25s; }
+.tip { position: fixed; display: block; width: 380px; max-width: calc(100vw - 24px); background: #1c1f26; border: 1px solid #343a47; border-radius: 12px; padding: 16px 18px; box-shadow: 0 24px 60px rgba(0, 0, 0, .6); }
+.tip h3 { margin: 2px 0 6px; font-size: 16px; }
+.tip p { margin: 0 0 14px; color: #c9cdd6; line-height: 1.5; }
+.tip kbd { background: #14161b; border: 1px solid #2a2e38; border-radius: 4px; padding: 0 5px; font: 12px "Cascadia Mono", Consolas, monospace; white-space: nowrap; }
+.step { font-size: 11.5px; color: #8a90a0; letter-spacing: .04em; text-transform: uppercase; }
+.btns { display: flex; align-items: center; gap: 8px; }
+.grow { flex: 1; }
+button { font: inherit; color: #e6e8ec; background: #252a34; border: 1px solid #343a47; border-radius: 6px; padding: 7px 14px; cursor: pointer; }
+button:hover { border-color: #4a5160; }
+button.primary { background: #2f6bff; border-color: #2f6bff; color: #fff; font-weight: 600; }
+button.ghost { background: transparent; border-color: transparent; color: #8a90a0; }
+button:focus-visible { outline: 2px solid #8fb0ff; outline-offset: 2px; }
+[hidden] { display: none !important; }
