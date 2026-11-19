@@ -1,0 +1,20 @@
+// Elenco delle novità, dalla più recente. Per ogni nuova versione aggiungi una voce in cima.
+window.NOVITA = [
+  { v: '0.13.0', titolo: 'Novità dopo ogni aggiornamento', righe: [
+    ['Nuovo', 'Dopo un aggiornamento compare questa finestra con cosa è cambiato. La riapri quando vuoi dal menu, voce "Novità di questa versione".'] ] },
+  { v: '0.12.4', titolo: 'Calibrazione a tutto schermo', righe: [
+    ['Nuovo', 'La pagina di calibrazione occupa tutto lo schermo: niente più barre di scorrimento.'],
+    ['Nuovo', 'I passi stanno in una finestrella che puoi trascinare dove vuoi.'] ] },
+  { v: '0.12.3', titolo: 'Finestre affiancate più affidabili', righe: [
+    ['Corretto', 'Con due grafici affiancati, spostando molto il divisore la colonna dei prezzi non veniva più letta. Ora viene ritrovata da sola, anche per spostamenti grandi.'],
+    ['Corretto', 'Linee tratteggiate e riquadri degli ordini non vengono più scambiati per le etichette dei prezzi.'] ] },
+  { v: '0.12.1', titolo: 'Finestre affiancate e data del replay', righe: [
+    ['Corretto', 'Se sposti il divisore tra i due grafici, la colonna dei prezzi viene cercata sullo schermo e la calibrazione non si perde.'],
+    ['Corretto', 'La riga con la data del replay, quando si allunga, viene letta anche fuori dal rettangolo calibrato.'] ] },
+  { v: '0.12.0', titolo: 'Più pratico: meno clic, più automatico', righe: [
+    ['Nuovo', 'Salva subito, senza finestra di conferma, se la lettura è completa e sicura. Se qualcosa non torna, ti chiede conferma come prima. Lo attivi o disattivi nelle Impostazioni.'],
+    ['Nuovo', 'Configurazione guidata al primo avvio: piattaforma, calibrazione, tasti (F1 apre, F2 TP, F3 SL, F4 a mano), tipo di barra. La riapri dal menu.'],
+    ['Nuovo', 'Gli aggiornamenti escono da soli quando cambia il numero di versione.'] ] },
+  { v: '0.11.0', titolo: 'Tutorial guidato', righe: [
+    ['Nuovo', 'Giro guidato della barra con nuvolette: parte la prima volta e lo riapri dal menu, voce Tutorial.'] ] },
+];

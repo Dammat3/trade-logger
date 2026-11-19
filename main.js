@@ -1228,6 +1228,21 @@ function createToolbar() {
   toolbar.on('closed', () => app.quit());
 }
 
+// ---------- finestra "Novità" dopo un aggiornamento ----------
+let novitaWin = null;
+function openNovita() {
+  if (alive(novitaWin)) { novitaWin.show(); novitaWin.focus(); return; }
+  novitaWin = new BrowserWindow({
+    width: 560, height: 640, backgroundColor: '#14161b', title: 'Novità', icon: path.join(__dirname, 'build', 'icon.png'),
+    webPreferences: { preload: path.join(__dirname, 'preload.js') },
+  });
+  novitaWin.setMenuBarVisibility(false);
+  novitaWin.loadFile('ui/novita.html');
+  novitaWin.on('closed', () => { novitaWin = null; const c = getConfig(); c.lastSeenVersion = app.getVersion(); saveConfig(c); });
+}
+ipcMain.handle('novita:get', () => ({ current: app.getVersion(), since: getConfig().lastSeenVersion || '' }));
+ipcMain.handle('novita:close', () => { if (alive(novitaWin)) novitaWin.close(); });
+
 // ---------- configurazione guidata (primo avvio) ----------
 let wizardWin = null;
 function openWizard() {
@@ -1378,6 +1393,7 @@ ipcMain.handle('toolbar:menu', () => {
     { label: `Piattaforma: ${pname}`, submenu: platformMenu() },
     { type: 'separator' },
     { label: 'Impostazioni…', click: () => openSettings() },
+    { label: 'Novità di questa versione…', click: () => openNovita() },
     { label: 'Configurazione guidata…', click: () => openWizard() },
     { label: 'Tutorial…', click: () => startTour() },
     { type: 'separator' },
@@ -1635,8 +1651,12 @@ app.whenReady().then(() => {
   createToolbar();
   setTimeout(() => {              // primo avvio: configurazione guidata e poi il giro; chi ha già una piattaforma calibrata va diretto al giro
     const c = getConfig();
-    if (!c.wizardDone && !platformList().platforms.some((p) => p.calibrated)) openWizard();
-    else { if (!c.wizardDone) { c.wizardDone = true; saveConfig(c); } if (!c.tourDone) startTour(); }
+    if (!c.wizardDone && !platformList().platforms.some((p) => p.calibrated)) { c.lastSeenVersion = app.getVersion(); saveConfig(c); openWizard(); }   // installazione nuova: niente novità
+    else {
+      if (!c.wizardDone) { c.wizardDone = true; saveConfig(c); }
+      if (!c.tourDone) startTour();
+      else if (c.lastSeenVersion !== app.getVersion()) openNovita();   // dopo un aggiornamento: cosa è cambiato
+    }
   }, 2500);
   getWorker().catch((e) => console.error('OCR non pronto:', e)); // prepara l'OCR in anticipo
   setTimeout(syncAll, 3000);                 // invia eventuali trade rimasti indietro
