@@ -5,11 +5,12 @@
 <link rel="stylesheet" href="calibrate.css">
 </head>
 <body>
-  <header>
+  <div id="wrap"><img id="shot" alt="Screenshot da calibrare" draggable="false"><div id="sel" hidden></div><div id="done"></div></div>
+  <aside id="panel">
+    <div id="grip" title="Trascina per spostare questa finestra">⠿ Calibrazione · trascina qui per spostare</div>
     <div id="msg">Carico lo screenshot…</div>
     <div class="buttons"><button id="skip" hidden>Salta</button><button id="redo">Ricomincia</button><button id="close">Chiudi</button></div>
-  </header>
-  <section id="result" hidden></section>
-  <div id="wrap"><img id="shot" alt="Screenshot da calibrare" draggable="false"><div id="sel" hidden></div><div id="done"></div></div>
+    <section id="result" hidden></section>
+  </aside>
   <script src="calibrate.js"></script>
 </body></html>

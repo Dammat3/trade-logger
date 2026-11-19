@@ -1148,12 +1148,12 @@ async function openCalibration(layout = 'normal') {
   calib = { img, displayId, layout: layoutNow };
   if (alive(calibWin)) calibWin.close();
   calibWin = new BrowserWindow({
-    width: 1200, height: 800, show: false, backgroundColor: '#14161b', title: 'Calibrazione',
+    width: 1200, height: 800, show: false, backgroundColor: '#000000', title: 'Calibrazione', fullscreen: true, autoHideMenuBar: true,
     icon: path.join(__dirname, 'build', 'icon.png'), webPreferences: { preload: path.join(__dirname, 'preload.js') },
   });
   calibWin.setMenuBarVisibility(false);
   calibWin.loadFile('ui/calibrate.html');
-  calibWin.once('ready-to-show', () => { calibWin.maximize(); calibWin.show(); });
+  calibWin.once('ready-to-show', () => { calibWin.setFullScreen(true); calibWin.show(); });
   status('Pronto');
 }
 

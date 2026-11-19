@@ -1,13 +1,18 @@
-body { padding: 0; }
-header { position: sticky; top: 0; z-index: 2; display: flex; gap: 16px; align-items: center; justify-content: space-between; padding: 12px 16px; background: var(--panel); border-bottom: 1px solid var(--line); }
-#msg { font-size: 15px; max-width: 75ch; }
+html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: #000; }
+/* finestra a schermo intero: lo screenshot occupa tutto lo schermo, senza scorrimento; i passi stanno in un pannello che si sposta */
+#panel { position: fixed; top: 16px; left: 16px; z-index: 10; width: 440px; max-width: calc(100vw - 32px); max-height: calc(100vh - 32px); overflow: auto; box-sizing: border-box;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 10px 40px rgba(0, 0, 0, .6); }
+#grip { padding: 8px 12px; font-size: 12px; color: var(--muted, #98a1b2); background: rgba(255, 255, 255, .05); border-radius: 10px 10px 0 0; cursor: grab; user-select: none; touch-action: none; }
+#grip.drag { cursor: grabbing; }
+#msg { font-size: 14.5px; line-height: 1.45; padding: 12px 14px 8px; }
+.buttons { padding: 0 14px 12px; flex-wrap: wrap; }
 #msg b { color: #fff; }
 .buttons { display: flex; gap: 8px; flex-shrink: 0; }
-#result { padding: 12px 16px; background: #182219; border-bottom: 1px solid var(--line); }
+#result { padding: 12px 14px; background: #182219; border-top: 1px solid var(--line); border-radius: 0 0 10px 10px; font-size: 13.5px; }
 #result table { border-collapse: collapse; margin-top: 6px; }
 #result td { padding: 3px 14px 3px 0; }
-#wrap { position: relative; display: inline-block; margin: 12px 16px; cursor: crosshair; user-select: none; }
-#shot { display: block; max-width: calc(100vw - 32px); height: auto; }
+#wrap { position: absolute; left: 0; top: 0; cursor: crosshair; user-select: none; }
+#shot { display: block; width: 100%; height: 100%; max-width: none; }
 #sel, .box { position: absolute; border: 2px solid var(--entry); background: rgba(47, 107, 255, .15); pointer-events: none; }
 .box.price { border-color: var(--tp); background: rgba(47, 191, 113, .15); }
 .box.balance { border-color: var(--sl); background: rgba(232, 147, 58, .15); }

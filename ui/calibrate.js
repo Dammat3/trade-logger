@@ -11,6 +11,27 @@ const steps = [
   { key: 'axisRect', cls: 'axis', optional: true, text: '<b>Solo per i backtest:</b> trascina un rettangolo lungo e basso sulla <b>striscia delle ore sotto il grafico</b>: è lì che compare la data quando il mouse è sul grafico.' },
   { key: 'shotRect', cls: 'shot', optional: true, text: '<b>Facoltativo:</b> trascina un rettangolo intorno alla parte dello schermo da salvare come screenshot nel journal (di solito la <b>finestra del browser</b>, senza barra delle applicazioni). Per leggere i valori si usa comunque tutto lo schermo. Se salti, nel journal va tutto lo schermo.' },
 ];
+// lo screenshot riempie lo schermo, mantenendo le proporzioni
+function fit() {
+  if (!img.naturalWidth) return;
+  const s = Math.min(innerWidth / img.naturalWidth, innerHeight / img.naturalHeight), w = Math.round(img.naturalWidth * s), h = Math.round(img.naturalHeight * s);
+  wrap.style.width = w + 'px'; wrap.style.height = h + 'px';
+  wrap.style.left = Math.round((innerWidth - w) / 2) + 'px'; wrap.style.top = Math.round((innerHeight - h) / 2) + 'px';
+}
+addEventListener('resize', fit);
+// pannello dei passi spostabile
+(function () {
+  const panel = $('panel'), grip = $('grip'); let off = null;
+  grip.addEventListener('pointerdown', (e) => { const r = panel.getBoundingClientRect(); off = { x: e.clientX - r.left, y: e.clientY - r.top }; grip.classList.add('drag'); grip.setPointerCapture(e.pointerId); });
+  grip.addEventListener('pointermove', (e) => {
+    if (!off) return;
+    const r = panel.getBoundingClientRect();
+    panel.style.left = Math.min(Math.max(0, e.clientX - off.x), Math.max(0, innerWidth - r.width)) + 'px';
+    panel.style.top = Math.min(Math.max(0, e.clientY - off.y), Math.max(0, innerHeight - 40)) + 'px';
+  });
+  const end = () => { off = null; grip.classList.remove('drag'); };
+  grip.addEventListener('pointerup', end); grip.addEventListener('pointercancel', end);
+})();
 let step = 0, start = null, rects = { hues: {} }, platform = '';
 const canvas = document.createElement('canvas'), ctx = canvas.getContext('2d', { willReadFrequently: true });
 
@@ -98,6 +119,6 @@ $('close').onclick = () => api.closeCalibration();
 api.getCalibration().then((c) => {
   if (!c) return;
   platform = c.platform || '';
-  img.onload = () => { canvas.width = img.naturalWidth; canvas.height = img.naturalHeight; ctx.drawImage(img, 0, 0); reset(); };
+  img.onload = () => { fit(); canvas.width = img.naturalWidth; canvas.height = img.naturalHeight; ctx.drawImage(img, 0, 0); reset(); };
   img.src = c.image;
 });
