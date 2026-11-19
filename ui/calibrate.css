@@ -23,3 +23,6 @@ html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: 
 #result td { padding-right: 18px; }
 .box.symbol { border-color: #4fd1c5; background: rgba(79, 209, 197, .15); }
 .box.shot { border-color: #f472b6; background: rgba(244, 114, 182, .12); }
+
+.found { margin: 8px 0; padding: 0; list-style: none; display: grid; gap: 3px; }
+.neg { color: #ff8a8a; }

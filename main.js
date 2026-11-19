@@ -7,6 +7,7 @@ const path = require('path');
 const fs = require('fs');
 const { createWorker } = require('tesseract.js');
 const { parseSymbolEx, parseReplayDateSmart } = require('./analyzer');
+const autocal = require('./autocal');
 const { labelCoverage, boxColumns, findLabels, findOrderBox, labelSpan, decimalsOf, pickPrices, parseContracts, parseBoxMoney, parseBalance, reconcileMoney, parseNumber, direction, parseReplayTime, parseReplayDate } = require('./analyzer');
 const { createClient } = require('@supabase/supabase-js');
 
@@ -1544,6 +1545,21 @@ ipcMain.handle('calib:save', async (_e, rects) => {
   const res = await analyze(calib.img, c);  // prova subito la lettura sullo stesso screenshot
   const rp = await readReplay(calib.img, c);
   return { ...res, replayTime: rp.time, replayDate: rp.date, hasClock: !!c.clockRect, hasAxis: !!c.axisRect, hasSymbol: !!c.symbolRect, hasShot: !!c.shotRect };
+});
+// calibrazione automatica: trova da sola colonna dei prezzi, saldo, orologio e riga della data (vedi autocal.js)
+ipcMain.handle('calib:auto', async () => {
+  if (!calib) return null;
+  try {
+    const img = calib.img, c = getConfig(), size = img.getSize();
+    const col = autocal.findPriceColumn(img, c.hues);
+    const w = await getWorker();
+    await w.setParameters({ tessedit_pageseg_mode: '11', tessedit_char_whitelist: '' });
+    const { data } = await w.recognize(img.toPNG());
+    const words = (data.words || []).map((x) => ({ t: x.text, x0: x.bbox.x0, y0: x.bbox.y0, x1: x.bbox.x1, y1: x.bbox.y1 }));
+    const r = autocal.buildRects(size, col, words);
+    const hues = {}; if (c.hues) for (const k of ['TP', 'SL', 'ENTRY']) if (c.hues[k]) hues[k] = c.hues[k].h;   // i colori già insegnati restano
+    return { ...r, hues, size, multiple: !!(col && col.multiple) };
+  } catch (e) { return { rects: {}, found: {}, notes: ['Non sono riuscito a leggere lo schermo: ' + (e.message || e)], hues: {}, size: calib.img.getSize() }; }
 });
 ipcMain.handle('calib:close', () => { if (alive(calibWin)) calibWin.close(); calib = null; });
 

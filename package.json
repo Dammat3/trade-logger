@@ -1,6 +1,6 @@
 {
   "name": "trade-logger",
-  "version": "0.13.0",
+  "version": "0.14.0",
   "description": "Barra per registrare i trade di FX Replay leggendo lo schermo",
   "main": "main.js",
   "scripts": {
@@ -33,6 +33,7 @@
       "updater.js",
       "preload.js",
       "analyzer.js",
+      "autocal.js",
       "store.js",
       "newsfetch.js",
       "news.js",

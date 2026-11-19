@@ -32,18 +32,54 @@ addEventListener('resize', fit);
   const end = () => { off = null; grip.classList.remove('drag'); };
   grip.addEventListener('pointerup', end); grip.addEventListener('pointercancel', end);
 })();
-let step = 0, start = null, rects = { hues: {} }, platform = '';
+let plan = steps, step = 0, start = null, rects = { hues: {} }, platform = '', autoOffer = null;
 const canvas = document.createElement('canvas'), ctx = canvas.getContext('2d', { willReadFrequently: true });
 
+// ----- calibrazione automatica -----
+const CLS = { priceRect: 'price', balanceRect: 'balance', clockRect: 'clock', axisRect: 'axis' };
+const LBL = { priceRect: 'colonna dei prezzi', balanceRect: 'saldo', clockRect: 'orologio del replay', axisRect: 'riga della data' };
+function btns(show) { for (const id of ['auto', 'accept', 'manual', 'skip']) $(id).hidden = !show.includes(id); }
+function offerAuto() {
+  plan = []; step = 0; autoOffer = null; wrap.style.cursor = 'default';
+  $('msg').innerHTML = `<b>${platform ? platform + ' — ' : ''}calibrazione.</b> Provo a trovare da solo colonna dei prezzi, saldo, orologio e riga della data. Serve un <b>trade aperto</b> con take profit e stop loss visibili sul grafico. Se non va bene, disegni tu i rettangoli.`;
+  btns(['auto', 'manual']);
+}
+function startManual() { plan = steps; step = 0; autoOffer = null; done.innerHTML = ''; rects = { hues: {} }; showStep(); }
+async function runAuto() {
+  btns([]); $('msg').innerHTML = '<b>Cerco…</b> ci vogliono alcuni secondi.';
+  const r = await api.calibAuto();
+  if (!r) { offerAuto(); return; }
+  autoOffer = r; done.innerHTML = '';
+  const k = img.naturalWidth / img.clientWidth;
+  for (const key of Object.keys(CLS)) {
+    const q = r.rects[key]; if (!q) continue;
+    const b = document.createElement('div'); b.className = 'box ' + CLS[key];
+    boxStyle(b, { x: q.x / k, y: q.y / k }, { x: (q.x + q.width) / k, y: (q.y + q.height) / k }); done.appendChild(b);
+  }
+  const list = Object.keys(CLS).map((key) => `<li>${r.found[key] ? '✅' : (key === 'clockRect' || key === 'axisRect') ? '➖' : '❌'} ${LBL[key]}${r.found[key] ? '' : (key === 'clockRect' || key === 'axisRect') ? ' (serve solo per i backtest)' : ' non trovato'}</li>`).join('');
+  const ok = r.found.priceRect && r.found.balanceRect;
+  $('msg').innerHTML = `<b>Ecco cosa ho trovato</b> (i riquadri colorati sullo schermo).<ul class="found">${list}</ul>${(r.notes || []).map((n) => `<p class="neg">${n}</p>`).join('')}${r.multiple ? '<p class="muted">Ci sono più colonne con etichette: ho scelto la più chiara.</p>' : ''}${ok ? 'Controlla che i riquadri siano al posto giusto.' : 'Quello che manca lo disegni tu.'}`;
+  $('accept').textContent = ok ? 'Va bene, continua' : 'Completo a mano quello che manca';
+  btns(['accept', 'manual']);
+}
+function acceptAuto() {
+  const r = autoOffer; if (!r) return;
+  rects = { ...r.rects, hues: r.hues || {} };
+  plan = steps.filter((s) => !r.found[s.key] && !(s.click && r.found.priceRect));   // restano i passi che l'automatico non ha coperto (e quelli facoltativi: simbolo, area screenshot)
+  step = 0; autoOffer = null;
+  if (!plan.length) { finish(); return; }
+  showStep();
+}
+
 function showStep() {
-  const st = steps[step];
-  $('msg').innerHTML = st ? `<b>${platform ? platform + ' — ' : ''}passo ${step + 1} di ${steps.length}.</b> ${st.text}` : 'Leggo i valori…';
-  $('skip').hidden = !(st && st.optional);
+  btns(plan[step] && plan[step].optional ? ['skip'] : []);
+  const st = plan[step];
+  $('msg').innerHTML = st ? `<b>${platform ? platform + ' — ' : ''}passo ${step + 1} di ${plan.length}.</b> ${st.text}` : 'Leggo i valori…';
   $('skip').textContent = st && st.click ? 'Salta (colore standard)' : 'Salta';
   wrap.style.cursor = st && st.click ? 'pointer' : 'crosshair';
 }
-function reset() { step = 0; rects = { hues: {} }; done.innerHTML = ''; $('result').hidden = true; showStep(); }
-function next() { step++; showStep(); if (step === steps.length) finish(); }
+function reset() { plan = steps; step = 0; rects = { hues: {} }; done.innerHTML = ''; $('result').hidden = true; offerAuto(); }
+function next() { step++; showStep(); if (step === plan.length) finish(); }
 
 function hueAt(nx, ny) {
   // media 3x3 intorno al punto cliccato, poi tonalità (0-360)
@@ -84,8 +120,8 @@ function boxStyle(el, a, b) {
 }
 
 wrap.addEventListener('mousedown', (e) => {
-  if (step >= steps.length) return;
-  const st = steps[step], k = img.naturalWidth / img.clientWidth, p = pos(e);
+  if (step >= plan.length) return;
+  const st = plan[step], k = img.naturalWidth / img.clientWidth, p = pos(e);
   if (st.click) {
     const pr = rects.priceRect, nx = p.x * k, ny = p.y * k;
     if (pr && (nx < pr.x - 4 || nx > pr.x + pr.width + 4 || ny < pr.y - 4 || ny > pr.y + pr.height + 4)) {
@@ -105,15 +141,18 @@ window.addEventListener('mouseup', (e) => {
   const end = pos(e); const a = start; start = null; sel.hidden = true;
   if (Math.abs(a.x - end.x) < 5 || Math.abs(a.y - end.y) < 5) return;
   const k = img.naturalWidth / img.clientWidth;
-  rects[steps[step].key] = {
+  rects[plan[step].key] = {
     x: Math.round(Math.min(a.x, end.x) * k), y: Math.round(Math.min(a.y, end.y) * k),
     width: Math.round(Math.abs(a.x - end.x) * k), height: Math.round(Math.abs(a.y - end.y) * k),
   };
-  const box = document.createElement('div'); box.className = 'box ' + steps[step].cls; boxStyle(box, a, end); done.appendChild(box);
+  const box = document.createElement('div'); box.className = 'box ' + plan[step].cls; boxStyle(box, a, end); done.appendChild(box);
   next();
 });
 
 $('skip').onclick = () => next();
+$('auto').onclick = runAuto;
+$('manual').onclick = startManual;
+$('accept').onclick = acceptAuto;
 $('redo').onclick = reset;
 $('close').onclick = () => api.closeCalibration();
 api.getCalibration().then((c) => {
