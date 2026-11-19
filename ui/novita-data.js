@@ -1,5 +1,7 @@
 // Elenco delle novità, dalla più recente. Per ogni nuova versione aggiungi una voce in cima.
 window.NOVITA = [
+  { v: '0.14.6', titolo: 'Calibrazione automatica: riga della data', righe: [
+    ['Corretto', 'La riga della data sotto il grafico ora viene trovata anche quando gli orari si leggono male; se proprio non si leggono, viene stimata sotto il grafico e ti avvisa di controllarla.'] ] },
   { v: '0.14.5', titolo: 'Tempo per mettere il mouse sul grafico', righe: [
     ['Nuovo', 'Prima di fotografare lo schermo per la calibrazione c\'è un conto alla rovescia (6 secondi, 10 a schermo intero) in una finestrella: serve a mettere il mouse sul grafico, così sotto il grafico compare la data. Il mouse passa attraverso la finestrella, quindi non devi fare altro.'] ] },
   { v: '0.14.4', titolo: 'Calibrazione più sicura', righe: [

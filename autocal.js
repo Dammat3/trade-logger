@@ -62,15 +62,19 @@ function buildRects(size, col, words) {
   const clk = words.filter((w) => /UTC/.test(w.t) && /\d{4,}/.test(w.t) || /^\d{2}:\d{2}:\d{2}$/.test(w.t)).sort((a, b) => b.y0 - a.y0)[0];
   if (clk) { rects.clockRect = clampR({ x: clk.x0 - 10, y: clk.y0 - 6, width: Math.min(clk.x1 - clk.x0, 120) + 20, height: clk.y1 - clk.y0 + 12 }); found.clockRect = true; }
 
-  // riga dell'asse del tempo sotto il grafico (dove compare la data con il mouse sul grafico)
+  // riga dell'asse del tempo sotto il grafico (dove compare la data con il mouse sul grafico): cerco la riga con più orari/date letti
+  // in basso a sinistra della colonna dei prezzi; se non la trovo la stimo dalla fine dell'asse dei prezzi
   const limit = col ? col.x + col.width : W;
-  const times = words.filter((w) => w.y0 > H * 0.75 && w.x1 <= limit && /^(\d{2}:?\d{2}|\d{4})$/.test(w.t));
-  if (times.length >= 3) {
-    const cy = median(times.map((w) => (w.y0 + w.y1) / 2)), row = times.filter((w) => Math.abs((w.y0 + w.y1) / 2 - cy) < 14);
-    if (row.length >= 3) {
-      const x0 = Math.max(0, Math.min(...row.map((w) => w.x0)) - 30);
-      rects.axisRect = clampR({ x: x0, y: cy - 17, width: (col ? col.x - 6 : limit) - x0, height: 34 }); found.axisRect = true;
-    }
+  const cand = words.filter((w) => w.y0 > H * 0.7 && w.x1 <= limit && /\d{2}/.test(w.t) && w.t.length <= 8).map((w) => ({ ...w, cy: (w.y0 + w.y1) / 2 })).sort((a, b) => a.cy - b.cy);
+  const rowsG = []; for (const w of cand) { const g = rowsG[rowsG.length - 1]; if (g && Math.abs(w.cy - g.cy) <= 9) { g.w.push(w); g.cy = g.w.reduce((t, q) => t + q.cy, 0) / g.w.length; } else rowsG.push({ cy: w.cy, w: [w] }); }
+  const best = rowsG.filter((g) => g.w.length >= 3 && Math.max(...g.w.map((q) => q.x1)) - Math.min(...g.w.map((q) => q.x0)) >= 150).sort((a, b) => b.w.length - a.w.length)[0];
+  if (best) {
+    const x0 = Math.max(0, Math.min(...best.w.map((w) => w.x0)) - 30);
+    rects.axisRect = clampR({ x: x0, y: best.cy - 17, width: (col ? col.x - 6 : limit) - x0, height: 34 }); found.axisRect = true;
+  } else if (rects.priceRect) {
+    const pr = rects.priceRect, x0 = Math.round(W * 0.06);
+    rects.axisRect = clampR({ x: x0, y: pr.y + pr.height - 6, width: pr.x - 6 - x0, height: 48 }); found.axisRect = true;
+    notes.push('Riga della data: non ho letto gli orari, l\'ho stimata sotto il grafico. Controlla che il riquadro giallo copra la striscia delle ore.');
   }
   return { rects, found, notes };
 }
