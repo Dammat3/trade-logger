@@ -14,11 +14,13 @@ const steps = [
 // lo screenshot riempie lo schermo, mantenendo le proporzioni
 function fit() {
   if (!img.naturalWidth) return;
-  const s = Math.min(innerWidth / img.naturalWidth, innerHeight / img.naturalHeight), w = Math.round(img.naturalWidth * s), h = Math.round(img.naturalHeight * s);
+  const vw = innerWidth > 200 ? innerWidth : (screen.availWidth || 1200), vh = innerHeight > 200 ? innerHeight : (screen.availHeight || 800);   // finestra non ancora dimensionata: uso lo schermo
+  const s = Math.min(vw / img.naturalWidth, vh / img.naturalHeight), w = Math.round(img.naturalWidth * s), h = Math.round(img.naturalHeight * s);
   wrap.style.width = w + 'px'; wrap.style.height = h + 'px';
-  wrap.style.left = Math.round((innerWidth - w) / 2) + 'px'; wrap.style.top = Math.round((innerHeight - h) / 2) + 'px';
+  wrap.style.left = Math.round(Math.max(0, vw - w) / 2) + 'px'; wrap.style.top = Math.round(Math.max(0, vh - h) / 2) + 'px';
 }
 addEventListener('resize', fit);
+for (const ms of [200, 600, 1200, 2500, 5000]) setTimeout(fit, ms);   // nei primi secondi la finestra può cambiare misura (ingrandimento): ricalcolo
 // pannello dei passi spostabile
 (function () {
   const panel = $('panel'), grip = $('grip'); let off = null;
