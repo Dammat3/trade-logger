@@ -135,7 +135,44 @@ async function chooseLayout(img) {
   layoutNow = layout; lastLayout = layout;
   return { layout, how, note: fullOk ? `Layout: ${layoutName(layout)}${how ? ' (' + how + ')' : ''}.` : '' };
 }
-async function layoutFor(img) { const info = await chooseLayout(img); return { cfg: getConfig(), info }; }
+// Finestre affiancate (due grafici sullo schermo): se trascini il divisore, la colonna dei prezzi si sposta in orizzontale e il
+// rettangolo calibrato non la trova più. Allora cerco la colonna dei prezzi lungo tutta la larghezza dello schermo (solo colori,
+// niente OCR, quindi è veloce) e uso quella posizione per questa lettura.
+const SHIFT_KEYS = ['priceRect'];   // si sposta solo la colonna dei prezzi: saldo, orologio e simbolo restano dove sono
+function relocateCfg(img, cfg) {
+  try {
+    if (!cfg.priceRect) return { cfg, dx: 0 };
+    const r = clampRect(cfg.priceRect, img), imgW = img.getSize().width;
+    const labelsAt = (x) => {                                     // quante etichette (TP, SL, ingresso) vedo in una colonna larga come quella calibrata
+      const rr = clampRect({ ...cfg.priceRect, x }, img), c = img.crop(rr), sz = c.getSize(), L = findLabels(c.toBitmap(), sz.width, sz.height, cfg.hues);
+      return ['TP', 'SL', 'ENTRY'].filter((n) => L[n]).length;
+    };
+    const base = labelsAt(r.x);
+    if (base >= 2) return { cfg, dx: 0 };                      // la calibrazione trova già le etichette: non tocco niente
+    const scoreAt = labelsAt;
+    const pts = [];
+    for (let x = 0; x + r.width <= imgW; x += 16) pts.push({ x, sc: scoreAt(x) });
+    const top = Math.max(...pts.map((q) => q.sc));
+    if (top < 2 || top <= base) return { cfg, dx: 0 };
+    // più posizioni vicine danno lo stesso punteggio (la finestra vede l'etichetta anche solo in parte): prendo il centro del gruppo
+    // consecutivo con il punteggio massimo più vicino a dove ero
+    const groups = []; let cur = null;
+    for (const q of pts) { if (q.sc === top) { if (cur && q.x - cur.to <= 16) cur.to = q.x; else { cur = { from: q.x, to: q.x }; groups.push(cur); } } }
+    groups.sort((g1, g2) => Math.abs((g1.from + g1.to) / 2 - r.x) - Math.abs((g2.from + g2.to) / 2 - r.x));
+    const best = { x: Math.round((groups[0].from + groups[0].to) / 2) };
+    const dx = best.x - r.x;
+    if (!dx) return { cfg, dx: 0 };
+    const out = { ...cfg };
+    for (const k of SHIFT_KEYS) if (cfg[k]) { const nx = cfg[k].x + dx; if (nx >= 0 && nx + cfg[k].width <= imgW) out[k] = { ...cfg[k], x: nx }; }   // se uscirebbe dallo schermo lascio com'era
+    return { cfg: out, dx };
+  } catch (e) { return { cfg, dx: 0 }; }
+}
+async function layoutFor(img) {
+  const info = await chooseLayout(img);
+  const rel = relocateCfg(img, getConfig());
+  if (rel.dx) info.note = ((info.note || '') + ` Finestra spostata di ${rel.dx} px: trovata da sola.`).trim();
+  return { cfg: rel.cfg, info };
+}
 function isCalibrated() {
   const p = migrate(readJSON(CONFIG_FILE, {})); const pl = p.platforms[p.activePlatform] || {};
   return !!((pl.priceRect && pl.balanceRect) || (pl.full && pl.full.priceRect && pl.full.balanceRect));
@@ -719,9 +756,18 @@ async function readReplay(img, cfg, hintYear) {
     const w = await getWorker();
     await w.setParameters({ tessedit_char_whitelist: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789:'’\" .", tessedit_pageseg_mode: '7' });
     const r = clampRect(cfg.axisRect, img);
-    const big = img.crop(r).resize({ width: r.width * 3, height: r.height * 3, quality: 'best' });
-    const { data } = await w.recognize(big.toPNG());
-    const pd = parseReplayDateSmart(data.text, { hintYear });
+    const readAxis = async (rr) => {
+      const big = img.crop(rr).resize({ width: rr.width * 3, height: rr.height * 3, quality: 'best' });
+      return (await w.recognize(big.toPNG())).data;
+    };
+    let data = await readAxis(r);
+    let pd = parseReplayDateSmart(data.text, { hintYear });
+    if (!pd) {
+      // la riga della data si allunga con la finestra (finestre affiancate): se nel rettangolo calibrato non c'è, riprovo su una fascia più larga
+      const iw = img.getSize().width, x0 = Math.max(0, r.x - Math.round(r.width * 1.5)), x1 = Math.min(iw, r.x + r.width + Math.round(r.width * 1.5));
+      const wide = clampRect({ x: x0, y: r.y, width: x1 - x0, height: r.height }, img);
+      if (wide.width > r.width) { const d2 = await readAxis(wide), p2 = parseReplayDateSmart(d2.text, { hintYear }); if (p2) { data = d2; pd = p2; } }
+    }
     if (pd) { out.date = pd.date; out.dateRaw = pd.raw; out.dateConf = pd.conf; } else out.dateRaw = String(data.text || '').trim().slice(0, 60);
   }
   return out;
