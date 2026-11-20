@@ -5,7 +5,7 @@ let msg = 'Pronto', open = null, online = null, pending = 0, mode = 'minimal', v
 function render() {
   const dot = $('dot');
   const busy = /…$/.test(msg);
-  dot.className = 'dot' + (busy ? ' busy' : online ? (pending ? ' wait' : ' on') : '');
+  dot.className = 'dot' + (busy ? ' busy' : open ? ' on' : '');   // blu che pulsa = sto leggendo; verde = c'è un trade aperto; arancione = nessun trade aperto
   const conn = online ? `Salvo sul PC e invio una copia online (${online.account || 'conto'})` + (pending ? `: ${pending} trade da inviare` : '') : 'Salvataggio sul PC (nessuna copia online)';
   const tr = open ? `Aperto: ${open.symbol || '—'} ${open.direction || ''}` : 'Nessun trade aperto';
   dot.title = `${conn}\n${msg}\n${tr}`;
