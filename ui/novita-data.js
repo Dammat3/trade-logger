@@ -1,6 +1,6 @@
 // Elenco delle novità, dalla più recente. Per ogni nuova versione aggiungi una voce in cima.
 window.NOVITA = [
-  { v: '0.15.9', titolo: 'Replay più fluido e più leggero', righe: [
+  { v: '0.15.10', titolo: 'Replay più fluido e più leggero', righe: [
     ['Nuovo', 'Replay (beta): nelle Impostazioni puoi scegliere la qualità delle immagini (alta, media, leggera) per occupare meno spazio sul disco.'],
     ['Nuovo', 'Replay (beta): ora puoi registrare fino a 4 fotogrammi al secondo (Impostazioni > Replay dei trade). Il lettore del Journal ha velocità da 0,5× a 8×.'] ] },
   { v: '0.15.6', titolo: 'Replay dei trade (beta) e pallino', righe: [
