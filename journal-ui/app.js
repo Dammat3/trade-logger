@@ -1265,8 +1265,21 @@ async function autoRefresh() {
     if (before !== after && !D) renderPage();
   } catch { /* riprovo al prossimo giro */ } finally { refreshing = false; }
 }
-document.addEventListener('visibilitychange', autoRefresh);
-setInterval(autoRefresh, 60 * 1000);
+// Conti creati o cambiati da Trade Logger (o da un'altra finestra): aggiorno l'elenco e il menu del conto
+async function refreshAccounts() {
+  if (!S.local || !S.accountId || !$('#page')) return;
+  try {
+    const list = await S.db.listAccounts();
+    const key = (a) => JSON.stringify(a.map((x) => [x.id, x.name, x.kind, !!x.shared]));
+    if (key(list) === key(S.accounts)) return;
+    if (D || V) { S.accounts = list; return; }               // con una finestra aperta aggiorno i dati e ridisegno alla chiusura/al prossimo giro
+    S.accounts = list;
+    if (!S.accounts.some((x) => x.id === S.accountId)) { S.accountId = S.accounts[0] && S.accounts[0].id; await loadAccountData(); }
+    renderShell();
+  } catch { /* riprovo al prossimo giro */ }
+}
+document.addEventListener('visibilitychange', () => { refreshAccounts(); autoRefresh(); });
+setInterval(() => { refreshAccounts(); autoRefresh(); }, 60 * 1000);
 
 (async function boot() {
   const params = new URLSearchParams(location.search);
@@ -1952,7 +1965,7 @@ async function renderNews() {
 // =====================================================================
 function localHooks() {
   // Trade Logger (un altro programma) scrive negli stessi file: quando cambiano aggiorno la vista
-  window.localStore.onChange(() => { autoRefresh(); refreshLocalSettings(); });
+  window.localStore.onChange(() => { refreshAccounts(); autoRefresh(); refreshLocalSettings(); });
   setInterval(autoRefresh, 15 * 1000);
   const news = () => S.db.call('refreshNews', { manual: false }).catch(() => {});
   setTimeout(news, 4000); setInterval(news, 3 * 3600e3);       // notizie economiche: da sole, se c'è internet
