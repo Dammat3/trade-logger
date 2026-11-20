@@ -1444,6 +1444,97 @@ function insights(list) {
   return out;
 }
 
+
+// ---------- Correzioni (beta): regole semplici sui tuoi numeri, niente AI ----------
+// Ogni regola guarda un comportamento preciso, si attiva solo con abbastanza trade e dice quanti ne ha usati.
+function corrections(list) {
+  const out = [], T = [...closedOf(list)].sort(sortTrades);
+  if (T.length < 10) return { items: [], few: true, n: T.length };
+  const st = stats(T);
+  const sum = (a) => a.reduce((s, t) => s + t.pnl, 0);
+  const avg = (a) => (a.length ? sum(a) / a.length : 0);
+  const mins = (t) => { const m = /^(\d{1,2}):(\d{2})/.exec(t.trade_time || ''); return m ? Number(m[1]) * 60 + Number(m[2]) : null; };
+  const conf = (n) => (n >= 30 ? 'buona' : n >= 12 ? 'media' : 'bassa');
+  const add = (sev, title, text, tip, n) => out.push({ sev, title, text, tip, n, conf: conf(n) });
+  const days = new Map(); T.forEach((t) => { (days.get(t.trade_date) || days.set(t.trade_date, []).get(t.trade_date)).push(t); });
+
+  // 1. trade presi subito dopo una perdita (stesso giorno, entro 30 minuti)
+  const quick = [];
+  days.forEach((ts) => { for (let i = 1; i < ts.length; i++) { const p = ts[i - 1], c = ts[i], a = mins(p), b = mins(c); if (p.pnl < 0 && a != null && b != null && b - a >= 0 && b - a <= 30) quick.push(c); } });
+  if (quick.length >= 5 && sum(quick) < 0 && avg(quick) < st.expectancy) {
+    add('warn', 'Rientri veloci dopo una perdita', `Dopo una perdita hai riaperto entro 30 minuti ${quick.length} volte: risultato ${money(sum(quick))}, media ${money(avg(quick))} a trade (la tua media generale è ${money(st.expectancy)}).`, 'Prova una pausa fissa dopo ogni stop (per esempio 30 minuti) e riguarda il trade prima di rientrare.', quick.length);
+  }
+  // 2. continuare dopo 2 perdite nello stesso giorno
+  const after2 = [];
+  days.forEach((ts) => { let l = 0; for (const t of ts) { if (l >= 2) after2.push(t); l = t.pnl < 0 ? l + 1 : 0; } });
+  if (after2.length >= 5 && sum(after2) < 0) {
+    add('warn', 'Dopo due perdite di fila nello stesso giorno', `I trade presi dopo 2 perdite consecutive nello stesso giorno sono ${after2.length} e valgono ${money(sum(after2))} in totale (win rate ${pct(after2.filter((t) => t.pnl > 0).length / after2.length)}).`, 'Valuta una regola semplice: dopo 2 stop consecutivi, chiudi la giornata.', after2.length);
+  }
+  // 3. troppi trade in un giorno
+  const dv = [...days.values()].filter((d) => d.length >= 1);
+  if (dv.length >= 8) {
+    const counts = dv.map((d) => d.length).sort((x, y) => x - y), med = counts[Math.floor(counts.length / 2)], lim = Math.max(med * 2, med + 2);
+    const many = dv.filter((d) => d.length >= lim), few = dv.filter((d) => d.length < lim);
+    if (many.length >= 3 && few.length >= 3 && avg(many.map((d) => ({ pnl: sum(d) }))) < 0 && avg(many.map((d) => ({ pnl: sum(d) }))) < avg(few.map((d) => ({ pnl: sum(d) })))) {
+      add('warn', 'Giornate con troppi trade', `Nei giorni con ${lim} o più trade (${many.length} giorni) il risultato medio è ${money(avg(many.map((d) => ({ pnl: sum(d) }))))} al giorno, contro ${money(avg(few.map((d) => ({ pnl: sum(d) }))))} negli altri.`, `Metti un limite di trade giornalieri (per esempio ${Math.max(1, lim - 1)}).`, many.reduce((s, d) => s + d.length, 0));
+    }
+  }
+  // 4. posizione più grande dopo una perdita
+  const cs = T.map((t) => t.contracts).filter((c) => c > 0);
+  if (cs.length >= 10) {
+    const mc = cs.reduce((s, c) => s + c, 0) / cs.length, big = [];
+    days.forEach((ts) => { for (let i = 1; i < ts.length; i++) if (ts[i - 1].pnl < 0 && ts[i].contracts > mc * 1.3) big.push(ts[i]); });
+    if (big.length >= 4 && sum(big) < 0) add('warn', 'Più contratti dopo una perdita', `Per ${big.length} volte, dopo un trade in perdita hai aperto con molti più contratti del solito (oltre il 30% in più): risultato ${money(sum(big))}.`, 'Tieni la stessa size dopo una perdita: aumentare per "recuperare" è la strada più rapida per un conto in rosso.', big.length);
+  }
+  // 5. rischio per trade irregolare
+  const rk = T.map((t) => (t.sl_usd != null && t.sl_usd < 0 ? -t.sl_usd : null)).filter((x) => x != null);
+  if (rk.length >= 10) {
+    const m = rk.reduce((s, x) => s + x, 0) / rk.length, sd = Math.sqrt(rk.reduce((s, x) => s + (x - m) ** 2, 0) / rk.length);
+    if (sd / m > 0.5) add('info', 'Rischio per trade molto variabile', `Lo stop vale in media ${moneyPlain(m)}, ma varia molto (da ${moneyPlain(Math.min(...rk))} a ${moneyPlain(Math.max(...rk))}).`, 'Un rischio costante rende i risultati confrontabili e le statistiche più affidabili.', rk.length);
+  }
+  // 6. vincenti chiusi a mano molto prima del target
+  const man = T.filter((t) => t.outcome === 'MANUALE' && t.pnl > 0 && t.tp_usd > 0);
+  if (man.length >= 4) {
+    const ratio = man.reduce((s, t) => s + t.pnl / t.tp_usd, 0) / man.length;
+    if (ratio < 0.6) add('warn', 'Vincenti chiusi troppo presto', `Hai chiuso a mano ${man.length} trade in guadagno, in media al ${Math.round(ratio * 100)}% del target.`, 'Se il piano prevedeva il target, chiudere prima riduce il guadagno medio senza ridurre le perdite. Controlla nel replay cosa è successo dopo.', man.length);
+  }
+  // 7. perdita enorme rispetto alle altre
+  const losses = T.filter((t) => t.pnl < 0);
+  if (losses.length >= 8) {
+    const worst = losses.reduce((a, b) => (b.pnl < a.pnl ? b : a)), others = losses.filter((t) => t !== worst), mo = -avg(others);
+    if (-worst.pnl > mo * 2.5) add('warn', 'Una perdita molto più grande delle altre', `La perdita peggiore (${money(worst.pnl)} il ${worst.trade_date}) è ${fmt(-worst.pnl / mo)} volte la perdita media.`, 'Guarda quel trade: stop spostato, nessuno stop o size sbagliata? Evitare un caso così pesa più di tutto il resto.', losses.length);
+  }
+  // 8. orari, giorni, setup, emozioni, long/short in perdita
+  const hr = groupBy(T, (t) => [/^\d{1,2}:/.test(t.trade_time || '') ? hourLabel(t.trade_time) : null]).filter((g) => g.n >= 5 && g.pnl < 0).sort((a, b) => a.pnl - b.pnl)[0];
+  if (hr) add('warn', 'Una fascia oraria in perdita', `Tra le ${hr.key.replace('–', ' e le ')} hai ${hr.n} trade con ${money(hr.pnl)} in totale (win rate ${pct(hr.winRate)}).`, 'Prova a non operare in quella fascia per qualche settimana e confronta.', hr.n);
+  const wd = groupBy(T, (t) => [parseYmd(t.trade_date).getDay()]).filter((g) => g.n >= 5 && g.pnl < 0).sort((a, b) => a.pnl - b.pnl)[0];
+  if (wd) add('warn', 'Un giorno della settimana in perdita', `Il ${WEEKDAYS[wd.key].toLowerCase()} hai ${wd.n} trade con ${money(wd.pnl)} in totale.`, 'Chiediti se quel giorno operi con meno attenzione o in condizioni diverse.', wd.n);
+  const su = groupBy(T, (t) => [t.setup]).filter((g) => g.n >= 5 && g.pnl < 0 && g.gl > g.gw).sort((a, b) => a.pnl - b.pnl)[0];
+  if (su) add('warn', 'Un setup che perde', `Il setup "${su.key}" ha ${su.n} trade, ${money(su.pnl)} in totale e win rate ${pct(su.winRate)}.`, 'Riguarda i trade di questo setup: le regole sono chiare? Se non lo sono, mettilo in pausa.', su.n);
+  const em = groupBy(T, (t) => t.emotions).filter((g) => g.n >= 4 && g.avg < 0 && g.avg < st.expectancy).sort((a, b) => a.avg - b.avg)[0];
+  if (em) add('warn', 'Un\'emozione che costa', `Quando segni "${em.key.toLowerCase()}" (${em.n} trade) perdi in media ${moneyPlain(-em.avg)} a trade.`, 'Se ti accorgi di quell\'emozione prima di entrare, salta il trade o dimezza la size.', em.n);
+  const ls = groupBy(T, (t) => [t.direction]).filter((g) => (g.key === 'LONG' || g.key === 'SHORT') && g.n >= 8 && g.pnl < 0)[0];
+  if (ls) add('info', ls.key === 'LONG' ? 'I long non funzionano' : 'Gli short non funzionano', `${ls.key === 'LONG' ? 'In long' : 'In short'} hai ${ls.n} trade con ${money(ls.pnl)} in totale.`, 'Puoi provare a operare solo l\'altro lato per un periodo e vedere come cambia.', ls.n);
+  // 9. rapporto vincita/perdita rispetto al win rate
+  if (st.avgWin && st.avgLoss && st.avgLoss > st.avgWin && st.winRate != null && st.winRate < 1 / (1 + st.avgWin / st.avgLoss)) {
+    add('warn', 'Le perdite sono troppo grandi per il tuo win rate', `Vincita media ${moneyPlain(st.avgWin)}, perdita media ${moneyPlain(st.avgLoss)}: ti servirebbe un win rate sopra il ${Math.round(100 / (1 + st.avgWin / st.avgLoss))}%, ma sei al ${pct(st.winRate)}.`, 'Per riequilibrare, avvicina lo stop o allontana il target.', st.n);
+  }
+  // cosa funziona
+  const g1 = groupBy(T, (t) => [t.setup]).filter((g) => g.n >= 5 && g.pnl > 0 && g.gw > g.gl).sort((a, b) => b.pnl - a.pnl)[0];
+  if (g1) add('ok', 'Un setup che funziona', `Il setup "${g1.key}": ${g1.n} trade, ${money(g1.pnl)}, win rate ${pct(g1.winRate)}.`, 'Valuta di concentrarti su questo.', g1.n);
+  const h1 = groupBy(T, (t) => [/^\d{1,2}:/.test(t.trade_time || '') ? hourLabel(t.trade_time) : null]).filter((g) => g.n >= 5 && g.pnl > 0).sort((a, b) => b.pnl - a.pnl)[0];
+  if (h1) add('ok', 'Una fascia oraria che funziona', `Tra le ${h1.key.replace('–', ' e le ')}: ${h1.n} trade, ${money(h1.pnl)}.`, 'Sono i tuoi orari migliori: proteggili.', h1.n);
+  return { items: out, few: false, n: T.length };
+}
+function correctionsHTML(list) {
+  const c = corrections(list);
+  const head = '<div class="card-head"><h2>Correzioni <span class="beta">beta</span></h2></div>';
+  if (c.few) return `<section class="card">${head}<div class="empty small">Servono almeno 10 trade chiusi in questo anno per avere delle correzioni (ora ${c.n}).</div></section>`;
+  const body = c.items.length ? c.items.map((i) => `<div class="corr ${i.sev}"><div class="corr-t"><b>${esc(i.title)}</b><span class="corr-c" title="Quanti trade hanno usato le regole: con pochi trade il risultato può essere casuale">${i.n} trade · affidabilità ${i.conf}</span></div><div>${esc(i.text)}</div><div class="corr-tip">→ ${esc(i.tip)}</div></div>`).join('')
+    : '<div class="empty small">Nessun comportamento da correggere trovato in questi dati. Continua a segnare setup ed emozioni per avere analisi più precise.</div>';
+  return `<section class="card" id="repCorr">${head}<div class="corr-list">${body}</div><div class="foot-note">Sono regole semplici applicate ai tuoi numeri, senza intelligenza artificiale: segnalano dove guardare, non sono consigli finanziari. Con pochi trade possono dipendere dal caso.</div></section>`;
+}
+
 function renderReports() {
   const page = $('#page');
   const years = [...new Set(S.trades.map((t) => Number(t.trade_date.slice(0, 4))))];
@@ -1493,6 +1584,7 @@ function renderReports() {
     ${kpisHTML(list)}
     <section class="card"><div class="card-head"><h2>Cosa dicono i tuoi dati</h2></div>
       <ul class="insights">${insights(list).map((i) => `<li>${esc(i)}</li>`).join('')}</ul></section>
+    ${correctionsHTML(list)}
     <section class="card" id="repEq"><div class="card-head"><h2>Curva equity ${y}</h2></div>${equityBody(list)}</section>
     <div class="grid2">
       <section class="card"><div class="card-head"><h2>P&amp;L mensile</h2></div><div class="chart">${list.length ? barsSVG(monthRows.map((r) => ({ label: MONTHS_SHORT[r.m], value: r.st.net, title: `${r.name} ${y}` })), { w: 560, height: 300 }) : '<div class="empty small">Nessun trade.</div>'}</div></section>
