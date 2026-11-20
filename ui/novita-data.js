@@ -1,5 +1,7 @@
 // Elenco delle novità, dalla più recente. Per ogni nuova versione aggiungi una voce in cima.
 window.NOVITA = [
+  { v: '0.15.12', titolo: 'Mac con chip Apple', righe: [
+    ['Corretto', 'Mac: le app ora vengono firmate "ad hoc" durante la creazione, per aiutare l\'apertura sui Mac con chip Apple (M1, M2, M3…).'] ] },
   { v: '0.15.11', titolo: 'Menu dei tre puntini riordinato', righe: [
     ['Nuovo', 'Il menu dei tre puntini è stato riordinato: dopo Conto e Piattaforma ci sono i due Journal, poi Registra replay e Configurazione guidata; in fondo Tutorial, Novità e Impostazioni, sopra Chiudi Trade Logger.'] ] },
   { v: '0.15.10', titolo: 'Replay più fluido e più leggero', righe: [
