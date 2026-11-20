@@ -1703,10 +1703,10 @@ ipcMain.handle('file:open', async (_e, p) => {
 // ---------- Replay del trade (beta) ----------
 // Finché un trade è aperto, ogni pochi secondi salvo un fotogramma ridotto del grafico (la stessa area degli screenshot).
 // Nel Journal il tasto "Replay" li fa scorrere dall'apertura alla chiusura. Si attiva dal menu della barra o dalle Impostazioni.
-const REPLAY_MAX = 900;                       // massimo di fotogrammi per trade (circa 30 minuti a 2 secondi)
+const REPLAY_MAX = 3000;                      // massimo di fotogrammi per trade (circa 12 minuti a 4 al secondo, 100 minuti a 2 secondi)
 let rec = null;                               // { id, dir, n, last, timer, busy }
 const replayOn = () => !!getConfig().replayRec;
-const replayEvery = () => Math.min(10, Math.max(1, Number(getConfig().replayEvery) || 2));
+const replayEvery = () => Math.min(10, Math.max(0.25, Number(getConfig().replayEvery) || 2));
 function stopRec() {
   if (!rec) return;
   clearInterval(rec.timer); rec = null;
@@ -1722,12 +1722,18 @@ async function recTick() {
     if (!cur || cur.status !== 'aperto') { stopRec(); replaySync(); return; }     // chiuso o eliminato (anche dal Journal)
     if (process.platform === 'darwin' && systemPreferences.getMediaAccessStatus('screen') !== 'granted') return;
     const display = screen.getDisplayMatching(toolbar.getBounds());
-    const size = { width: Math.round(display.size.width * display.scaleFactor), height: Math.round(display.size.height * display.scaleFactor) };
-    const sources = await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: size });
+    const full = { width: Math.round(display.size.width * display.scaleFactor), height: Math.round(display.size.height * display.scaleFactor) };
+    // catturo già alla misura che serve (al massimo 1000 px di larghezza per l'area salvata): più veloce, quindi più fotogrammi al secondo
+    const rr = getConfig().shotRect, area = rr && rr.width >= 200 && rr.height >= 120 ? rr : null;
+    const f = Math.min(1, 1000 / (area ? area.width : full.width));
+    const sources = await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: { width: Math.max(2, Math.round(full.width * f)), height: Math.max(2, Math.round(full.height * f)) } });
     const src = sources.find((s) => s.display_id === String(display.id)) || sources[0];
     if (!src || rec !== r) return;
-    let img = forJournal(src.thumbnail, getConfig());
-    if (img.getSize().width > 1000) img = img.resize({ width: 1000, quality: 'good' });
+    let img = src.thumbnail;
+    if (area) {
+      const cr = clampRect({ x: Math.round(area.x * f), y: Math.round(area.y * f), width: Math.round(area.width * f), height: Math.round(area.height * f) }, img);
+      if (cr.width >= 100 && cr.height >= 60) img = img.crop(cr);
+    }
     const buf = img.toJPEG(60);
     const sig = require('crypto').createHash('md5').update(buf).digest('hex');
     if (sig === r.last) return;                       // grafico fermo (pausa): non serve un fotogramma uguale
@@ -1749,13 +1755,13 @@ function replaySync() {
     const dir = store.replayDir(open.id);
     store.mkdirp(dir);
     rec = { id: open.id, dir, n: store.replayFiles(open.id).length, last: '', timer: null, busy: false };
-    rec.timer = setInterval(recTick, replayEvery() * 1000);
+    rec.timer = setInterval(recTick, Math.round(replayEvery() * 1000));
     try { toolbar.setContentProtection(true); } catch { /* la barra potrebbe comparire nei fotogrammi */ }
     refreshToolbar();
   } catch (e) { status('Replay non disponibile: ' + (e && e.message || e)); stopRec(); }
 }
 function setReplay(on, every) {
-  const c = getConfig(); c.replayRec = !!on; if (every != null) c.replayEvery = Math.min(10, Math.max(1, Number(every) || 2)); saveConfig(c);
+  const c = getConfig(); c.replayRec = !!on; if (every != null) c.replayEvery = Math.min(10, Math.max(0.25, Number(every) || 2)); saveConfig(c);
   stopRec(); replaySync();
   return { on: replayOn(), every: replayEvery() };
 }

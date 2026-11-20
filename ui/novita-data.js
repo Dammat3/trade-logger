@@ -1,5 +1,7 @@
 // Elenco delle novità, dalla più recente. Per ogni nuova versione aggiungi una voce in cima.
 window.NOVITA = [
+  { v: '0.15.7', titolo: 'Replay più fluido', righe: [
+    ['Nuovo', 'Replay (beta): ora puoi registrare fino a 4 fotogrammi al secondo (Impostazioni > Replay dei trade). Il lettore del Journal ha velocità da 0,5× a 8×.'] ] },
   { v: '0.15.6', titolo: 'Replay dei trade (beta) e pallino', righe: [
     ['Nuovo', 'Replay (beta): se lo attivi (menu della barra o Impostazioni), mentre un trade è aperto la barra salva ogni pochi secondi un fotogramma del grafico. Nel Journal, aprendo il trade, il tasto Replay li fa scorrere dall\'apertura alla chiusura. Vale per i trade aperti da ora in poi.'],
     ['Nuovo', 'Il pallino della barra è verde quando c\'è un trade aperto e arancione quando non ce ne sono. Lo stato della copia online resta nel suggerimento che appare passandoci sopra.'],

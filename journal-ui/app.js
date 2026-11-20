@@ -984,7 +984,7 @@ async function openReplay(t) {
       <button class="btn" data-rpplay aria-label="Avvia o metti in pausa">⏸</button>
       <input type="range" min="0" max="${urls.length - 1}" value="0" data-rpseek aria-label="Posizione">
       <span class="rp-count muted small"></span>
-      <select data-rpspeed aria-label="Velocità"><option value="2">0,5×</option><option value="4" selected>1×</option><option value="8">2×</option><option value="16">4×</option><option value="32">8×</option></select>
+      <select data-rpspeed aria-label="Velocità"><option value="3">0,5×</option><option value="6" selected>1×</option><option value="12">2×</option><option value="24">4×</option><option value="48">8×</option></select>
     </div></div>`;
   document.body.appendChild(ov);
   const img = ov.querySelector('img'), seek = ov.querySelector('[data-rpseek]'), cnt = ov.querySelector('.rp-count'), pb = ov.querySelector('[data-rpplay]'), sp = ov.querySelector('[data-rpspeed]');
