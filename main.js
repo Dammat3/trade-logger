@@ -6,7 +6,7 @@ const { fetchEvents } = require('./newsfetch');
 const path = require('path');
 const fs = require('fs');
 const { createWorker } = require('tesseract.js');
-const { parseSymbolEx, parseReplayDateSmart, findAxisBoxes } = require('./analyzer');
+const { parseSymbolEx, parseReplayDateSmart, findAxisBoxes, parseAxisTick, fitAxis, refineLineY, applyScale } = require('./analyzer');
 const autocal = require('./autocal');
 const { labelCoverage, boxColumns, findLabels, findOrderBox, labelSpan, decimalsOf, pickPrices, parseContracts, parseBoxMoney, parseBalance, reconcileMoney, parseNumber, direction, parseReplayTime, parseReplayDate } = require('./analyzer');
 const { createClient } = require('@supabase/supabase-js');
@@ -185,6 +185,7 @@ const getTrades = () => store.readTrades();
 function tradesChanged() {
   if (alive(journalWin)) journalWin.webContents.send('trades:changed');
   refreshToolbar();
+  replaySync();
 }
 // conto attivo (locale): il programma funziona anche senza nessun collegamento online
 function activeAccount() {
@@ -212,6 +213,7 @@ function refreshToolbar() {
     open: open ? { symbol: open.symbol, direction: open.direction, count: getTrades().filter((t) => t.status === 'aperto').length } : null,
     online: (link.url && link.key && link.email) ? { account: act ? act.name : '' } : null,       // copia online facoltativa
     pending,
+    rec: !!rec,
     mode: barModeOf(c),
     values: curValues(),
   });
@@ -308,6 +310,7 @@ function warnIfSizeChanged(img, cfg) {
   if (b && (Math.abs(a.width - b.width) > 4 || Math.abs(a.height - b.height) > 4))
     status(`Attenzione: questo schermo è di misura diversa (${a.width}×${a.height}) da quello della calibrazione (${b.width}×${b.height}). Se legge male, ricalibra qui.`);
 }
+let captureBusy = false;
 async function capture(displayId) {
   const displays = screen.getAllDisplays();
   const display = displays.find((d) => String(d.id) === String(displayId)) || screen.getDisplayMatching(toolbar.getBounds());
@@ -317,6 +320,7 @@ async function capture(displayId) {
     throw new Error('Il Mac non mi ha ancora dato il permesso di vedere lo schermo. Si è aperta la finestra "Registrazione schermo": attiva Trade Logger, poi chiudi e riapri Trade Logger e riprova.');
   }
   toolbar.hide();                 // la barra non deve coprire il grafico
+  captureBusy = true;
   await sleep(300);
   try {
     const size = {
@@ -328,6 +332,7 @@ async function capture(displayId) {
     const img = nativeImage.createFromBuffer(src.thumbnail.toPNG(), { scaleFactor: 1 });
     return { img, displayId: display.id };
   } finally {
+    captureBusy = false;
     toolbar.showInactive();
   }
 }
@@ -367,6 +372,7 @@ async function readBalance(img, cfg, forceWide = false) {
 
 async function analyze(img, cfg) {
   const res = { tp: null, sl: null, entry: null };
+  let scaleCtx = null;
   if (cfg.priceRect) {
     const r = clampRect(cfg.priceRect, img);
     const crop = img.crop(r);
@@ -429,6 +435,7 @@ async function analyze(img, cfg) {
       }
     }
     Object.assign(res, picked);
+    scaleCtx = { r, crop, hues, labels, texts: { ...texts }, dec };
     // contratti e valore in denaro: dal riquadro dell'ordine ("8 | -496.00 USD")
     for (const [name, key] of [['SL', 'slUsd'], ['TP', 'tpUsd']]) {
       if (!boxes[name]) continue;
@@ -450,9 +457,38 @@ async function analyze(img, cfg) {
     const sx = parseSymbolEx(raw, known);
     res.symbol = sx.symbol; res.symbolRaw = raw.trim(); res.symbolFixed = sx.fixedFrom;
   }
+  if (scaleCtx) { try { await scaleCorrect(img, res, scaleCtx); } catch (e) { /* la scala è un aiuto in più: se non riesce resta la lettura normale */ } }
   reconcileMoney(res);
   res.direction = direction(res);
   return res;
+}
+
+// Scala dei prezzi: legge i numeri dell'asse (25,720.00 / 25,710.00 …), ne ricava la retta "altezza → prezzo" e con questa corregge
+// i prezzi delle etichette che l'OCR ha letto male (puntino di trascinamento sopra le cifre, etichette non piene come su TradeSea).
+async function scaleCorrect(img, res, ctx) {
+  const { r, crop, hues, labels, texts } = ctx;
+  if (!labels.TP && !labels.SL && !labels.ENTRY) return;
+  const { width, height } = crop.getSize();
+  const w = await getWorker();
+  await w.setParameters({ tessedit_char_whitelist: '0123456789.,', tessedit_pageseg_mode: '6' });
+  const big = crop.resize({ width: width * 3, height: height * 3, quality: 'best' });
+  const { data } = await w.recognize(big.toPNG());
+  const pts = (data.words || []).map((x) => ({ y: r.y + (x.bbox.y0 + x.bbox.y1) / 2 / 3, v: parseAxisTick(x.text) })).filter((p) => p.v != null);
+  const fit = fitAxis(pts);
+  if (!fit) return;
+  // altezza esatta delle linee: la linea colorata continua a sinistra dell'asse
+  const sw = Math.min(56, r.x - 2), ys = {}, sx = r.x - sw;
+  const strip = sw >= 20 ? img.crop({ x: sx, y: r.y, width: sw, height }).toBitmap() : null;
+  for (const [name, key] of [['TP', 'tp'], ['SL', 'sl'], ['ENTRY', 'entry']]) {
+    const L = labels[name]; if (!L) continue;
+    const yc = (L.y0 + L.y1) / 2;
+    ys[key] = r.y + (strip ? refineLineY(strip, sw, height, name, hues, yc) : yc);
+  }
+  const fixes = applyScale(res, fit, ys, texts, ctx.dec);
+  if (fixes.length) {
+    res.scaleFix = fixes;
+    res.scaleGuess = fixes.some((f) => f.how === 'scala');      // solo dall'altezza, senza cifre né importo che lo confermino: da controllare
+  }
 }
 
 
@@ -863,7 +899,7 @@ function platformList() {
 }
 ipcMain.handle('settings:get', async () => {
   const c = getConfig();
-  return { keys: getKeys(), defaults: DEFAULT_KEYS, mode: barModeOf(c), quickSave: !!c.quickSave, accountId: (activeAccount() || {}).id || '', ...platformList(), ...accountsInfo() };
+  return { keys: getKeys(), defaults: DEFAULT_KEYS, mode: barModeOf(c), quickSave: !!c.quickSave, replayRec: !!c.replayRec, replayEvery: replayEvery(), replayQuality: getConfig().replayQuality || 'alta', accountId: (activeAccount() || {}).id || '', ...platformList(), ...accountsInfo() };
 });
 ipcMain.handle('settings:platform', (_e, id) => { switchPlatform(id); return platformList(); });
 function createPlatform(name) {
@@ -1210,7 +1246,7 @@ const quickOn = () => !!getConfig().quickSave;
 const nz = (x) => x !== null && x !== undefined && x !== '';
 function quickOpenOk(d) {
   return quickOn() && nz(d.symbol) && (d.direction === 'LONG' || d.direction === 'SHORT') && nz(d.entry) && nz(d.tp) && nz(d.sl) && nz(d.balance)
-    && !d.priceHint && !d.moneyCheck && !d.priceFixed && !d.dateHint && nz(d.tradeDate) && (d.backtest ? nz(d.tradeTime) : true);
+    && !d.priceHint && !d.moneyCheck && !d.priceFixed && !d.scaleGuess && !d.dateHint && nz(d.tradeDate) && (d.backtest ? nz(d.tradeTime) : true);
 }
 function quickCloseOk(d) { return quickOn() && nz(d.balanceAfter) && nz(d.pnl) && !d.pnlHint; }
 function saveQuick(data) {
@@ -1437,13 +1473,11 @@ ipcMain.handle('toolbar:menu', () => {
     { label: `Conto: ${(activeAccount() || {}).name || 'nessuno'}`, submenu: accountMenu() },
     { label: `Piattaforma: ${pname}`, submenu: platformMenu() },
     { type: 'separator' },
-    { label: 'Impostazioni…', click: () => openSettings() },
-    { label: 'Novità di questa versione…', click: () => openNovita() },
-    { label: 'Configurazione guidata…', click: () => openWizard() },
-    { label: 'Tutorial…', click: () => startTour() },
-    { type: 'separator' },
     { label: 'Apri il Journal', click: () => openJournalApp() },
     { label: 'Journal semplice (dentro la barra)', click: () => openJournal() },
+    { type: 'separator' },
+    { label: 'Registra il replay dei trade (beta)', type: 'checkbox', checked: replayOn(), click: (mi) => setReplay(mi.checked) },
+    { label: 'Configurazione guidata…', click: () => openWizard() },
     { type: 'separator' },
     { label: 'Barra minimal', type: 'radio', checked: barModeOf(getConfig()) === 'minimal', click: () => { const c = getConfig(); c.barMode = 'minimal'; saveConfig(c); refreshToolbar(); } },
     { label: 'Barra estesa', type: 'radio', checked: getConfig().barMode === 'estesa', click: () => { const c = getConfig(); c.barMode = 'estesa'; saveConfig(c); refreshToolbar(); } },
@@ -1453,6 +1487,10 @@ ipcMain.handle('toolbar:menu', () => {
     { label: 'Copia link ultimo screenshot', enabled: localApi.isRunning(), click: () => copyLastShotLink() },
     { label: `Aggiorna notizie economiche${getConfig().newsLastOk ? `  (ultime: ${hhmm(getConfig().newsLastOk)})` : ''}`, click: () => runNewsFetch() },
     { type: 'separator' },
+    { label: 'Tutorial…', click: () => startTour() },
+    { label: 'Novità di questa versione…', click: () => openNovita() },
+    { label: 'Impostazioni…', click: () => openSettings() },
+    { type: 'separator' },
     { label: 'Chiudi Trade Logger', click: () => app.quit() },
   ]).popup({ window: toolbar });
 });
@@ -1460,6 +1498,7 @@ ipcMain.handle('toolbar:local', () => openJournal());
 
 // gli screenshot di un trade eliminato vanno nel cestino (non si perdono per sempre)
 function trashShots(t) {
+  try { const rd = store.replayDir(t.id); if (fs.existsSync(rd)) shell.trashItem(rd).catch(() => {}); } catch { /* niente */ }
   for (const rel of [t.shotOpen, t.shotClose, ...((t.images || []).map((i) => i.file))]) {
     const f = store.shotAbs(rel);
     if (f && fs.existsSync(f)) shell.trashItem(f).catch(() => {});
@@ -1686,7 +1725,81 @@ ipcMain.handle('shots:choose', async () => {
   tradesChanged();
   return { ...res, ...shotsInfo() };
 });
-ipcMain.handle('file:open', (_e, p) => { if (p && fs.existsSync(p)) shell.openPath(p); });
+ipcMain.handle('file:open', async (_e, p) => {
+  const f = p && store.shotAbs(p);                    // gli screenshot sono salvati con percorso relativo alla cartella screenshot
+  if (!f || !fs.existsSync(f)) return 'File non trovato';
+  return shell.openPath(f);
+});
+
+
+// ---------- Replay del trade (beta) ----------
+// Finché un trade è aperto, ogni pochi secondi salvo un fotogramma ridotto del grafico (la stessa area degli screenshot).
+// Nel Journal il tasto "Replay" li fa scorrere dall'apertura alla chiusura. Si attiva dal menu della barra o dalle Impostazioni.
+const REPLAY_MAX = 3000;                      // massimo di fotogrammi per trade (circa 12 minuti a 4 al secondo, 100 minuti a 2 secondi)
+let rec = null;                               // { id, dir, n, last, timer, busy }
+const replayOn = () => !!getConfig().replayRec;
+const REPLAY_Q = { alta: { w: 1000, q: 60 }, media: { w: 800, q: 50 }, leggera: { w: 640, q: 40 } };
+const replayQ = () => REPLAY_Q[getConfig().replayQuality] || REPLAY_Q.alta;
+const replayEvery = () => Math.min(10, Math.max(0.25, Number(getConfig().replayEvery) || 2));
+function stopRec() {
+  if (!rec) return;
+  clearInterval(rec.timer); rec = null;
+  try { if (alive(toolbar)) toolbar.setContentProtection(false); } catch { /* non supportato */ }
+  refreshToolbar();
+}
+async function recTick() {
+  const r = rec;
+  if (!r || r.busy || captureBusy || !alive(toolbar)) return;
+  r.busy = true;
+  try {
+    const cur = getTrades().find((x) => x.id === r.id);
+    if (!cur || cur.status !== 'aperto') { stopRec(); replaySync(); return; }     // chiuso o eliminato (anche dal Journal)
+    if (process.platform === 'darwin' && systemPreferences.getMediaAccessStatus('screen') !== 'granted') return;
+    const display = screen.getDisplayMatching(toolbar.getBounds());
+    const full = { width: Math.round(display.size.width * display.scaleFactor), height: Math.round(display.size.height * display.scaleFactor) };
+    // catturo già alla misura che serve (larghezza massima secondo la qualità scelta): più veloce, quindi più fotogrammi al secondo
+    const rr = getConfig().shotRect, area = rr && rr.width >= 200 && rr.height >= 120 ? rr : null;
+    const W = replayQ().w, f = Math.min(1, W / (area ? area.width : full.width));
+    const sources = await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: { width: Math.max(2, Math.round(full.width * f)), height: Math.max(2, Math.round(full.height * f)) } });
+    const src = sources.find((s) => s.display_id === String(display.id)) || sources[0];
+    if (!src || rec !== r) return;
+    let img = src.thumbnail;
+    if (area) {
+      const cr = clampRect({ x: Math.round(area.x * f), y: Math.round(area.y * f), width: Math.round(area.width * f), height: Math.round(area.height * f) }, img);
+      if (cr.width >= 100 && cr.height >= 60) img = img.crop(cr);
+    }
+    const buf = img.toJPEG(replayQ().q);
+    const sig = require('crypto').createHash('md5').update(buf).digest('hex');
+    if (sig === r.last) return;                       // grafico fermo (pausa): non serve un fotogramma uguale
+    r.last = sig;
+    if (r.n >= REPLAY_MAX) { status('Replay: raggiunto il massimo di fotogrammi per questo trade'); stopRec(); return; }
+    r.n += 1;
+    await fs.promises.writeFile(path.join(r.dir, String(r.n).padStart(5, '0') + '.jpg'), buf);
+  } catch (e) {
+    try { fs.appendFileSync(path.join(store.dataDir() || __dirname, 'errori.log'), `${new Date().toISOString()} (replay) ${e && e.stack || e}\n`); } catch { /* niente */ }
+  } finally { r.busy = false; }
+}
+// da richiamare quando cambia qualcosa (trade aperto/chiuso, interruttore): avvia, ferma o lascia com'è
+function replaySync() {
+  try {
+    const open = replayOn() ? getTrades().filter((t) => t.status === 'aperto').pop() : null;
+    if (!open) return stopRec();
+    if (rec && rec.id === open.id) return;
+    stopRec();
+    const dir = store.replayDir(open.id);
+    store.mkdirp(dir);
+    rec = { id: open.id, dir, n: store.replayFiles(open.id).length, last: '', timer: null, busy: false };
+    rec.timer = setInterval(recTick, Math.round(replayEvery() * 1000));
+    try { toolbar.setContentProtection(true); } catch { /* la barra potrebbe comparire nei fotogrammi */ }
+    refreshToolbar();
+  } catch (e) { status('Replay non disponibile: ' + (e && e.message || e)); stopRec(); }
+}
+function setReplay(on, every, quality) {
+  const c = getConfig(); c.replayRec = !!on; if (REPLAY_Q[quality]) c.replayQuality = quality; if (every != null) c.replayEvery = Math.min(10, Math.max(0.25, Number(every) || 2)); saveConfig(c);
+  stopRec(); replaySync();
+  return { on: replayOn(), every: replayEvery() };
+}
+ipcMain.handle('settings:replay', (_e, on, every, quality) => setReplay(on, every, quality));
 
 // ---------- avvio ----------
 // un errore inatteso non deve bloccare il programma con una finestra di errore: lo scrivo in errori.log e lo segnalo sulla barra
@@ -1719,6 +1832,7 @@ app.whenReady().then(() => {
     }
   }, 2500);
   getWorker().catch((e) => console.error('OCR non pronto:', e)); // prepara l'OCR in anticipo
+  setTimeout(replaySync, 1500);              // trade rimasto aperto con il replay attivo: riprende a registrare
   setTimeout(syncAll, 3000);                 // invia eventuali trade rimasti indietro
   setTimeout(() => pushSetups().then(refreshLists), 4000);          // consegna al database i setup creati finora solo sul PC
   applyLocalApi();

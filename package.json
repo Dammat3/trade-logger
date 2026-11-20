@@ -1,6 +1,6 @@
 {
   "name": "trade-logger",
-  "version": "0.15.3",
+  "version": "0.15.13",
   "description": "Barra per registrare i trade di FX Replay leggendo lo schermo",
   "main": "main.js",
   "scripts": {
@@ -22,6 +22,7 @@
   },
   "author": "Davide",
   "build": {
+    "afterPack": "build/afterpack.js",
     "appId": "it.tradelogger.app",
     "productName": "Trade Logger",
     "directories": {

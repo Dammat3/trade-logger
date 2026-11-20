@@ -1,5 +1,20 @@
 // Elenco delle novità, dalla più recente. Per ogni nuova versione aggiungi una voce in cima.
 window.NOVITA = [
+  { v: '0.15.13', titolo: 'Lettura più precisa dei prezzi', righe: [
+    ['Migliorato', 'La barra ora legge anche la scala dei prezzi a destra del grafico e la usa per controllare i prezzi di ingresso, take profit e stop loss. Serve quando il puntino sull\'etichetta copre le cifre (TradeSea) o l\'OCR sbaglia una cifra. Se un prezzo si ricava solo dall\'altezza, la finestra di conferma lo segnala.'] ] },
+  { v: '0.15.12', titolo: 'Mac con chip Apple', righe: [
+    ['Corretto', 'Mac: le app ora vengono firmate "ad hoc" durante la creazione, per aiutare l\'apertura sui Mac con chip Apple (M1, M2, M3…).'] ] },
+  { v: '0.15.11', titolo: 'Menu dei tre puntini riordinato', righe: [
+    ['Nuovo', 'Il menu dei tre puntini è stato riordinato: dopo Conto e Piattaforma ci sono i due Journal, poi Registra replay e Configurazione guidata; in fondo Tutorial, Novità e Impostazioni, sopra Chiudi Trade Logger.'] ] },
+  { v: '0.15.10', titolo: 'Replay più fluido e più leggero', righe: [
+    ['Nuovo', 'Replay (beta): nelle Impostazioni puoi scegliere la qualità delle immagini (alta, media, leggera) per occupare meno spazio sul disco.'],
+    ['Nuovo', 'Replay (beta): ora puoi registrare fino a 4 fotogrammi al secondo (Impostazioni > Replay dei trade). Il lettore del Journal ha velocità da 0,5× a 8×.'] ] },
+  { v: '0.15.6', titolo: 'Replay dei trade (beta) e pallino', righe: [
+    ['Nuovo', 'Replay (beta): se lo attivi (menu della barra o Impostazioni), mentre un trade è aperto la barra salva ogni pochi secondi un fotogramma del grafico. Nel Journal, aprendo il trade, il tasto Replay li fa scorrere dall\'apertura alla chiusura. Vale per i trade aperti da ora in poi.'],
+    ['Nuovo', 'Il pallino della barra è verde quando c\'è un trade aperto e arancione quando non ce ne sono. Lo stato della copia online resta nel suggerimento che appare passandoci sopra.'],
+    ['Corretto', 'Nella finestra "Copia sul PC" i pulsanti Apertura e Chiusura ora aprono davvero lo screenshot del trade.'] ] },
+  { v: '0.15.4', titolo: 'Finestre come prima', righe: [
+    ['Corretto', 'Ripristinato l\'aspetto della finestra di controllo del trade (apertura e chiusura): stessi colori e stessa disposizione di sempre.'] ] },
   { v: '0.15.3', titolo: 'Aggiornamenti senza impostazioni', righe: [
     ['Nuovo', 'L\'indirizzo degli aggiornamenti è già dentro la barra e il Journal: non devi più inserirlo. Entrambi controllano da soli all\'avvio. In Impostazioni resta il campo, solo per chi pubblica le versioni altrove.'] ] },
   { v: '0.15.2', titolo: 'Mac: un solo file e anche Intel', righe: [
