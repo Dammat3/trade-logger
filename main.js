@@ -1686,7 +1686,11 @@ ipcMain.handle('shots:choose', async () => {
   tradesChanged();
   return { ...res, ...shotsInfo() };
 });
-ipcMain.handle('file:open', (_e, p) => { if (p && fs.existsSync(p)) shell.openPath(p); });
+ipcMain.handle('file:open', async (_e, p) => {
+  const f = p && store.shotAbs(p);                    // gli screenshot sono salvati con percorso relativo alla cartella screenshot
+  if (!f || !fs.existsSync(f)) return 'File non trovato';
+  return shell.openPath(f);
+});
 
 // ---------- avvio ----------
 // un errore inatteso non deve bloccare il programma con una finestra di errore: lo scrivo in errori.log e lo segnalo sulla barra

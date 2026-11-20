@@ -1,5 +1,7 @@
 // Elenco delle novità, dalla più recente. Per ogni nuova versione aggiungi una voce in cima.
 window.NOVITA = [
+  { v: '0.15.5', titolo: 'Pulsanti Apertura e Chiusura', righe: [
+    ['Corretto', 'Nella finestra "Copia sul PC" i pulsanti Apertura e Chiusura ora aprono davvero lo screenshot del trade.'] ] },
   { v: '0.15.4', titolo: 'Finestre come prima', righe: [
     ['Corretto', 'Ripristinato l\'aspetto della finestra di controllo del trade (apertura e chiusura): stessi colori e stessa disposizione di sempre.'] ] },
   { v: '0.15.3', titolo: 'Aggiornamenti senza impostazioni', righe: [
