@@ -87,6 +87,8 @@ app.whenReady().then(() => {
   try { upd = updaterLib.create({ app, dialog, dataDir: () => store.dataDir(), name: 'Journal', channel: 'journal' }); upd.check({ silent: true }); } catch { /* gli aggiornamenti non devono bloccare l'avvio */ }
   try { core.autoBackup(); } catch { /* la copia automatica non deve mai bloccare l'avvio */ }
   ipcMain.handle('core', async (_e, method, args) => {
+    if (method === 'updateGet') return { url: upd ? upd.getUrl() : '' };
+    if (method === 'updateSet') { if (!upd) throw new Error('Aggiornamenti non disponibili'); return { url: upd.setUrl((args || {}).url) }; }
     if (method === 'updateCheck') { if (!upd) throw new Error('Aggiornamenti non disponibili'); return upd.check({ silent: false }); }
     if (!Object.prototype.hasOwnProperty.call(core, method)) throw new Error('Operazione sconosciuta');
     return core[method](args || {});

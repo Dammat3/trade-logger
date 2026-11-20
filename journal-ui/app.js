@@ -1232,7 +1232,7 @@ async function start() {
   try {
     S.settings = { customTags: [], ...(await S.db.getSettings()) };
     S.setupCounts = await S.db.setupCounts().catch(() => null);
-    if (S.local) S.localInfo = await S.db.call('info');
+    if (S.local) { S.localInfo = await S.db.call('info'); try { S.updUrl = (await S.db.call('updateGet')).url; } catch (e) { S.updUrl = ''; } }
     if (S.settings.theme && THEMES[S.settings.theme] && S.settings.theme !== currentTheme()) applyTheme(S.settings.theme);
     S.money = await S.db.hasMoneyCols().catch(() => false);
     S.accounts = await S.db.listAccounts();
@@ -1706,8 +1706,9 @@ function renderSettings() {
       <div class="foot-note">Il tema cambia solo l'aspetto: le funzioni sono identiche. Si ricorda su questo dispositivo e sugli altri dove accedi con lo stesso account. Lo trovi anche nel menu del profilo, in alto a destra.</div></section>
     ${S.local ? `<section class="card"><div class="card-head"><h2>Aggiornamenti</h2></div>
       <div class="pad-box"><label class="field"><span>Versione del Journal installata</span><input class="input" readonly value="${esc((S.localInfo && S.localInfo.version) || 'sconosciuta')}"></label>
-        <button class="btn primary" data-act="upd-check">Cerca aggiornamenti</button>
-        <p class="muted small" style="margin:8px 0 0">Il Journal controlla da solo all'avvio se c'è una versione nuova: non devi impostare nient'altro.</p></div></section>` : ''}
+        <label class="field"><span>Indirizzo degli aggiornamenti</span><input class="input" id="updUrl" spellcheck="false" value="${esc(S.updUrl || '')}" placeholder="https://github.com/NOME/trade-logger/releases/latest/download"></label>
+        <div class="row" style="gap:8px;flex-wrap:wrap"><button class="btn primary" data-act="upd-check">Cerca aggiornamenti</button><button class="btn" data-act="upd-save">Salva indirizzo</button></div>
+        <p class="muted small" style="margin:8px 0 0">Il Journal controlla da solo all'avvio se c'è una versione nuova. L'indirizzo è già impostato: cambialo solo se le versioni le pubblichi altrove. Se lo svuoti, torna quello predefinito.</p></div></section>` : ''}
     ${S.local ? localCard() : ''}
     <section class="card"><div class="card-head"><h2>Conti e backtest</h2><div class="grow"></div><button class="btn" data-act="newacc">+ Nuovo</button></div>
       <div class="table-wrap"><table><thead><tr><th>Nome</th><th>Tipo</th><th></th></tr></thead><tbody>
@@ -1979,6 +1980,7 @@ function localCard() {
 async function localAction(d) {
   const say = (t, err = false) => { S.locMsg = { t, err }; const m = $('#locMsg'); if (m) { m.textContent = t; m.className = 'small ' + (err ? 'neg' : 'pos'); } };   // il messaggio resta anche se la pagina si ridisegna
   if (d.act === 'upd-check') { await S.db.call('updateCheck'); return true; }
+  if (d.act === 'upd-save') { try { const r = await S.db.call('updateSet', { url: ($('#updUrl') || {}).value || '' }); S.updUrl = r.url; const i = $('#updUrl'); if (i) i.value = r.url; toast('Indirizzo salvato'); } catch (e) { toast(errMsg(e), true); } return true; }
   if (d.act === 'loc-open-data') { await S.db.call('openFolder', { which: 'data' }); return true; }
   if (d.act === 'loc-shots-open') { await S.db.call('openFolder', { which: 'shots' }); return true; }
   if (d.act === 'loc-shots-change') {
