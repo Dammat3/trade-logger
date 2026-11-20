@@ -126,9 +126,10 @@ $('layoutMode').addEventListener('change', async (e) => fillPlatforms(await api.
 
 // ----- barra -----
 $('quickSave').addEventListener('change', (e) => api.settingsQuick(e.target.checked));
-const saveReplay = () => api.settingsReplay($('replayRec').checked, Number($('replayEvery').value));
+const saveReplay = () => api.settingsReplay($('replayRec').checked, Number($('replayEvery').value), $('replayQuality').value);
 $('replayRec').addEventListener('change', saveReplay);
 $('replayEvery').addEventListener('change', saveReplay);
+$('replayQuality').addEventListener('change', saveReplay);
 document.querySelectorAll('input[name="mode"]').forEach((r) => r.addEventListener('change', (e) => api.settingsMode(e.target.value)));
 
 api.settingsGet().then((d) => {
@@ -137,7 +138,7 @@ api.settingsGet().then((d) => {
   fillPlatforms(d);
   document.querySelector(`input[name="mode"][value="${d.mode}"]`).checked = true;
   $('quickSave').checked = !!d.quickSave;
-  $('replayRec').checked = !!d.replayRec; $('replayEvery').value = String(d.replayEvery || 2);
+  $('replayRec').checked = !!d.replayRec; $('replayEvery').value = String(d.replayEvery || 2); $('replayQuality').value = d.replayQuality || 'alta';
   if (d.accounts) { $('linked').hidden = false; fillAccounts(d.accounts, d.accountId); if (!d.accountId) accMsg('Scegli un conto dalla tendina.', 'err'); }
   else $('notLinked').hidden = false;
 });

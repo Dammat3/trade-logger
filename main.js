@@ -868,7 +868,7 @@ function platformList() {
 }
 ipcMain.handle('settings:get', async () => {
   const c = getConfig();
-  return { keys: getKeys(), defaults: DEFAULT_KEYS, mode: barModeOf(c), quickSave: !!c.quickSave, replayRec: !!c.replayRec, replayEvery: replayEvery(), accountId: (activeAccount() || {}).id || '', ...platformList(), ...accountsInfo() };
+  return { keys: getKeys(), defaults: DEFAULT_KEYS, mode: barModeOf(c), quickSave: !!c.quickSave, replayRec: !!c.replayRec, replayEvery: replayEvery(), replayQuality: getConfig().replayQuality || 'alta', accountId: (activeAccount() || {}).id || '', ...platformList(), ...accountsInfo() };
 });
 ipcMain.handle('settings:platform', (_e, id) => { switchPlatform(id); return platformList(); });
 function createPlatform(name) {
@@ -1706,6 +1706,8 @@ ipcMain.handle('file:open', async (_e, p) => {
 const REPLAY_MAX = 3000;                      // massimo di fotogrammi per trade (circa 12 minuti a 4 al secondo, 100 minuti a 2 secondi)
 let rec = null;                               // { id, dir, n, last, timer, busy }
 const replayOn = () => !!getConfig().replayRec;
+const REPLAY_Q = { alta: { w: 1000, q: 60 }, media: { w: 800, q: 50 }, leggera: { w: 640, q: 40 } };
+const replayQ = () => REPLAY_Q[getConfig().replayQuality] || REPLAY_Q.alta;
 const replayEvery = () => Math.min(10, Math.max(0.25, Number(getConfig().replayEvery) || 2));
 function stopRec() {
   if (!rec) return;
@@ -1723,9 +1725,9 @@ async function recTick() {
     if (process.platform === 'darwin' && systemPreferences.getMediaAccessStatus('screen') !== 'granted') return;
     const display = screen.getDisplayMatching(toolbar.getBounds());
     const full = { width: Math.round(display.size.width * display.scaleFactor), height: Math.round(display.size.height * display.scaleFactor) };
-    // catturo già alla misura che serve (al massimo 1000 px di larghezza per l'area salvata): più veloce, quindi più fotogrammi al secondo
+    // catturo già alla misura che serve (larghezza massima secondo la qualità scelta): più veloce, quindi più fotogrammi al secondo
     const rr = getConfig().shotRect, area = rr && rr.width >= 200 && rr.height >= 120 ? rr : null;
-    const f = Math.min(1, 1000 / (area ? area.width : full.width));
+    const W = replayQ().w, f = Math.min(1, W / (area ? area.width : full.width));
     const sources = await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: { width: Math.max(2, Math.round(full.width * f)), height: Math.max(2, Math.round(full.height * f)) } });
     const src = sources.find((s) => s.display_id === String(display.id)) || sources[0];
     if (!src || rec !== r) return;
@@ -1734,7 +1736,7 @@ async function recTick() {
       const cr = clampRect({ x: Math.round(area.x * f), y: Math.round(area.y * f), width: Math.round(area.width * f), height: Math.round(area.height * f) }, img);
       if (cr.width >= 100 && cr.height >= 60) img = img.crop(cr);
     }
-    const buf = img.toJPEG(60);
+    const buf = img.toJPEG(replayQ().q);
     const sig = require('crypto').createHash('md5').update(buf).digest('hex');
     if (sig === r.last) return;                       // grafico fermo (pausa): non serve un fotogramma uguale
     r.last = sig;
@@ -1760,12 +1762,12 @@ function replaySync() {
     refreshToolbar();
   } catch (e) { status('Replay non disponibile: ' + (e && e.message || e)); stopRec(); }
 }
-function setReplay(on, every) {
-  const c = getConfig(); c.replayRec = !!on; if (every != null) c.replayEvery = Math.min(10, Math.max(0.25, Number(every) || 2)); saveConfig(c);
+function setReplay(on, every, quality) {
+  const c = getConfig(); c.replayRec = !!on; if (REPLAY_Q[quality]) c.replayQuality = quality; if (every != null) c.replayEvery = Math.min(10, Math.max(0.25, Number(every) || 2)); saveConfig(c);
   stopRec(); replaySync();
   return { on: replayOn(), every: replayEvery() };
 }
-ipcMain.handle('settings:replay', (_e, on, every) => setReplay(on, every));
+ipcMain.handle('settings:replay', (_e, on, every, quality) => setReplay(on, every, quality));
 
 // ---------- avvio ----------
 // un errore inatteso non deve bloccare il programma con una finestra di errore: lo scrivo in errori.log e lo segnalo sulla barra
