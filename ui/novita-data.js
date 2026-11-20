@@ -1,5 +1,14 @@
 // Elenco delle novità, dalla più recente. Per ogni nuova versione aggiungi una voce in cima.
 window.NOVITA = [
+  { v: '0.15.4', titolo: 'Finestre come prima', righe: [
+    ['Corretto', 'Ripristinato l\'aspetto della finestra di controllo del trade (apertura e chiusura): stessi colori e stessa disposizione di sempre.'] ] },
+  { v: '0.15.3', titolo: 'Aggiornamenti senza impostazioni', righe: [
+    ['Nuovo', 'L\'indirizzo degli aggiornamenti è già dentro la barra e il Journal: non devi più inserirlo. Entrambi controllano da soli all\'avvio. In Impostazioni resta il campo, solo per chi pubblica le versioni altrove.'] ] },
+  { v: '0.15.2', titolo: 'Mac: un solo file e anche Intel', righe: [
+    ['Nuovo', 'Per Mac c\'è un unico file (Trade-Logger-Journal-Mac-arm64.dmg per i chip Apple, Trade-Logger-Journal-Mac-x64.dmg per i Mac Intel): lo apri e trascini le due app nella cartella Applicazioni.'],
+    ['Corretto', 'Nella release mancavano i file per i Mac Intel: ora ci sono.'] ] },
+  { v: '0.15.1', titolo: 'Versione per Mac', righe: [
+    ['Nuovo', 'Ogni release ora include anche i file per Mac (Trade Logger e Journal, per chip Apple e Intel). Su Mac non è firmata: la prima volta si apre con clic destro, Apri, e la barra chiede il permesso di Registrazione schermo. Gli aggiornamenti su Mac non sono automatici: si scarica la versione nuova.'] ] },
   { v: '0.15.0', titolo: 'Tutorial aggiornato', righe: [
     ['Nuovo', 'Il giro guidato nella barra ora spiega anche il salvataggio rapido, la configurazione guidata, la calibrazione automatica, le finestre affiancate, le impostazioni Base/Avanzate e gli aggiornamenti.'] ] },
   { v: '0.14.9', titolo: 'Installer unico', righe: [
