@@ -1,6 +1,6 @@
 {
   "name": "journal-local",
-  "version": "1.8.3",
+  "version": "1.8.10",
   "description": "Journal di trading sul PC: dati in cartelle, senza internet né account",
   "main": "journal-main.js",
   "dependencies": {
@@ -13,6 +13,7 @@
   },
   "author": "Davide",
   "build": {
+    "afterPack": "build/afterpack.js",
     "appId": "it.tradelogger.journal",
     "productName": "Journal",
     "directories": {

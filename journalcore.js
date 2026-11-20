@@ -76,6 +76,7 @@ function createCore(deps) {
   A.updateTrade = ({ id, patch }) => { const x = store.patchTrade(id, patchFromRow(patch), { bump: true }); return !!x; };
   async function trashShotsOf(t) {
     for (const rel of [t.shotOpen, t.shotClose, ...(t.images || []).map((i) => i.file)]) { const f = store.shotAbs(rel); if (f && fs.existsSync(f)) await trash(f); }
+    try { const rd = store.replayDir(t.id); if (fs.existsSync(rd)) await trash(rd); } catch { /* niente */ }
   }
   A.deleteTrade = async ({ id }) => { const gone = store.deleteTrade(id); if (gone) await trashShotsOf(gone); return !!gone; };
 
@@ -108,6 +109,9 @@ function createCore(deps) {
     if (file && fs.existsSync(file)) await trash(file);
     return true;
   };
+  // replay (beta): fotogrammi registrati da Trade Logger mentre il trade era aperto
+  A.replayInfo = ({ ids }) => { const m = {}; for (const id of ids || []) { const n = store.replayFiles(id).length; if (n > 1) m[id] = n; } return m; };
+  A.replayFrames = ({ id }) => store.replayFiles(id).map((f) => pathToFileURL(f).href);
   A.imageUrls = ({ paths }) => { const m = {}; for (const p of paths) if (p && fs.existsSync(p)) m[p] = pathToFileURL(p).href; return m; };
 
   // ----- analisi dei giorni -----

@@ -916,6 +916,7 @@ function tradeViewHTML() {
     <div class="tv-head">
       <div class="tv-title"><b>${esc(date)}</b><span class="muted">Trade ${i + 1} di ${n}${t.status === 'aperto' ? ' · aperto' : ''}${t.source === 'trade-logger' ? ' · da Trade Logger' : ''}</span></div>
       <span class="grow"></span>
+      ${S.local && V.replay && V.replay[t.id] ? '<button class="btn" data-tvreplay title="Rivedi le candele dall\'apertura alla chiusura">▶ Replay <span class="beta">beta</span></button>' : ''}
       <button class="btn primary" data-tvedit>✎ Modifica</button>
       <button class="btn ghost icon" data-tvclose aria-label="Chiudi">✕</button>
     </div>
@@ -946,7 +947,7 @@ function renderTradeView() { V.el.innerHTML = tradeViewHTML(); }
 async function openTradeView(day, focusId) {
   const list = S.trades.filter((t) => t.trade_date === day); if (!list.length) return openDayEdit(day, focusId);
   if (V) closeTradeView();
-  V = { day, id: (list.find((t) => t.id === focusId) || list[0]).id, urls: {}, el: null };
+  V = { day, id: (list.find((t) => t.id === focusId) || list[0]).id, urls: {}, replay: {}, el: null };
   const ov = document.createElement('div'); ov.className = 'overlay tv'; ov.id = 'tvOverlay'; V.el = ov;
   document.body.appendChild(ov); document.body.style.overflow = 'hidden';
   document.addEventListener('keydown', onTvKey);
@@ -956,14 +957,59 @@ async function openTradeView(day, focusId) {
     if (b.matches('[data-tvclose]')) return closeTradeView();
     if (b.matches('[data-tvmove]')) return tvMove(Number(b.dataset.tvmove));
     if (b.matches('[data-tvedit]')) return tvEdit();
+    if (b.matches('[data-tvreplay]')) return openReplay(tradeById(V.id));
     if (b.dataset.tvimg) { const t = tradeById(V.id); if (t) openViewer(t, b.dataset.tvimg); }
   });
   const paths = list.flatMap((t) => (t.trade_images || []).map((x) => x.path)).filter(Boolean);
   renderTradeView();
+  if (S.local) S.db.call('replayInfo', { ids: list.map((t) => t.id) }).then((m) => { if (V && V.el === ov) { V.replay = m || {}; renderTradeView(); } }).catch(() => {});
   if (paths.length) {
     try { Object.assign(V.urls, await S.db.imageUrls(paths)); } catch (e) { toast('Non riesco a caricare le immagini: ' + errMsg(e), true); }
     if (V && V.el === ov) renderTradeView();
   }
+}
+
+// ---------- Replay (beta): i fotogrammi registrati da Trade Logger, in sequenza ----------
+async function openReplay(t) {
+  if (!t || $('.rp')) return;
+  let urls = [];
+  try { urls = await S.db.call('replayFrames', { id: t.id }); } catch (e) { return toast('Non riesco a caricare il replay: ' + errMsg(e), true); }
+  if (!urls.length) return toast('Questo trade non ha fotogrammi registrati.', true);
+  const ov = document.createElement('div'); ov.className = 'overlay rp';
+  ov.innerHTML = `<div class="rp-win" role="dialog" aria-modal="true" aria-label="Replay del trade">
+    <div class="rp-head"><b>${esc(t.symbol || 'Trade')}${t.direction ? ' ' + (t.direction === 'LONG' ? 'Long' : 'Short') : ''}</b><span class="muted">Replay <span class="beta">beta</span></span><span class="grow"></span>
+      <button class="btn ghost icon" data-rpclose aria-label="Chiudi">✕</button></div>
+    <div class="rp-stage"><img alt="Fotogramma del replay"></div>
+    <div class="rp-bar">
+      <button class="btn" data-rpplay aria-label="Avvia o metti in pausa">⏸</button>
+      <input type="range" min="0" max="${urls.length - 1}" value="0" data-rpseek aria-label="Posizione">
+      <span class="rp-count muted small"></span>
+      <select data-rpspeed aria-label="Velocità"><option value="3">0,5×</option><option value="6" selected>1×</option><option value="12">2×</option><option value="24">4×</option><option value="48">8×</option></select>
+    </div></div>`;
+  document.body.appendChild(ov);
+  const img = ov.querySelector('img'), seek = ov.querySelector('[data-rpseek]'), cnt = ov.querySelector('.rp-count'), pb = ov.querySelector('[data-rpplay]'), sp = ov.querySelector('[data-rpspeed]');
+  let i = 0, playing = true, timer = null;
+  urls.forEach((u) => { const p = new Image(); p.src = u; });           // li carico in anticipo per una riproduzione fluida
+  const show = (k) => { i = Math.max(0, Math.min(urls.length - 1, k)); img.src = urls[i]; seek.value = i; cnt.textContent = `${i + 1} / ${urls.length}`; };
+  const stop = () => { playing = false; clearInterval(timer); pb.textContent = '▶'; };
+  const play = () => {
+    if (i >= urls.length - 1) show(0);
+    playing = true; pb.textContent = '⏸'; clearInterval(timer);
+    timer = setInterval(() => { if (i >= urls.length - 1) return stop(); show(i + 1); }, 1000 / Number(sp.value));
+  };
+  const close = () => { clearInterval(timer); document.removeEventListener('keydown', onKey, true); ov.remove(); };
+  function onKey(e) {
+    if (e.key === 'Escape') { e.stopPropagation(); close(); }
+    else if (e.key === ' ') { e.preventDefault(); playing ? stop() : play(); }
+    else if (e.key === 'ArrowLeft') { stop(); show(i - 1); }
+    else if (e.key === 'ArrowRight') { stop(); show(i + 1); }
+  }
+  document.addEventListener('keydown', onKey, true);
+  ov.addEventListener('mousedown', (e) => { if (e.target === ov) close(); });
+  ov.addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; if (b.matches('[data-rpclose]')) close(); else if (b.matches('[data-rpplay]')) { playing ? stop() : play(); } });
+  seek.addEventListener('input', () => { stop(); show(Number(seek.value)); });
+  sp.addEventListener('change', () => { if (playing) play(); });
+  show(0); play();
 }
 function tvMove(k) {
   const list = vTrades(); if (list.length < 2) return;
@@ -976,7 +1022,7 @@ function closeTradeView() {
   V.el.remove(); document.body.style.overflow = ''; document.removeEventListener('keydown', onTvKey); V = null;
 }
 function onTvKey(e) {
-  if (!V || $('.viewer') || $('.modal.small') || e.target.closest?.('input, textarea, select')) return;
+  if (!V || $('.viewer') || $('.rp') || $('.modal.small') || e.target.closest?.('input, textarea, select')) return;
   if (e.key === 'Escape') closeTradeView();
   else if (e.key === 'ArrowLeft') tvMove(-1);
   else if (e.key === 'ArrowRight') tvMove(1);
@@ -1232,7 +1278,7 @@ async function start() {
   try {
     S.settings = { customTags: [], ...(await S.db.getSettings()) };
     S.setupCounts = await S.db.setupCounts().catch(() => null);
-    if (S.local) S.localInfo = await S.db.call('info');
+    if (S.local) { S.localInfo = await S.db.call('info'); try { S.updUrl = (await S.db.call('updateGet')).url; } catch (e) { S.updUrl = ''; } }
     if (S.settings.theme && THEMES[S.settings.theme] && S.settings.theme !== currentTheme()) applyTheme(S.settings.theme);
     S.money = await S.db.hasMoneyCols().catch(() => false);
     S.accounts = await S.db.listAccounts();
@@ -1265,8 +1311,21 @@ async function autoRefresh() {
     if (before !== after && !D) renderPage();
   } catch { /* riprovo al prossimo giro */ } finally { refreshing = false; }
 }
-document.addEventListener('visibilitychange', autoRefresh);
-setInterval(autoRefresh, 60 * 1000);
+// Conti creati o cambiati da Trade Logger (o da un'altra finestra): aggiorno l'elenco e il menu del conto
+async function refreshAccounts() {
+  if (!S.local || !S.accountId || !$('#page')) return;
+  try {
+    const list = await S.db.listAccounts();
+    const key = (a) => JSON.stringify(a.map((x) => [x.id, x.name, x.kind, !!x.shared]));
+    if (key(list) === key(S.accounts)) return;
+    if (D || V) { S.accounts = list; return; }               // con una finestra aperta aggiorno i dati e ridisegno alla chiusura/al prossimo giro
+    S.accounts = list;
+    if (!S.accounts.some((x) => x.id === S.accountId)) { S.accountId = S.accounts[0] && S.accounts[0].id; await loadAccountData(); }
+    renderShell();
+  } catch { /* riprovo al prossimo giro */ }
+}
+document.addEventListener('visibilitychange', () => { refreshAccounts(); autoRefresh(); });
+setInterval(() => { refreshAccounts(); autoRefresh(); }, 60 * 1000);
 
 (async function boot() {
   const params = new URLSearchParams(location.search);
@@ -1385,6 +1444,97 @@ function insights(list) {
   return out;
 }
 
+
+// ---------- Correzioni (beta): regole semplici sui tuoi numeri, niente AI ----------
+// Ogni regola guarda un comportamento preciso, si attiva solo con abbastanza trade e dice quanti ne ha usati.
+function corrections(list) {
+  const out = [], T = [...closedOf(list)].sort(sortTrades);
+  if (T.length < 10) return { items: [], few: true, n: T.length };
+  const st = stats(T);
+  const sum = (a) => a.reduce((s, t) => s + t.pnl, 0);
+  const avg = (a) => (a.length ? sum(a) / a.length : 0);
+  const mins = (t) => { const m = /^(\d{1,2}):(\d{2})/.exec(t.trade_time || ''); return m ? Number(m[1]) * 60 + Number(m[2]) : null; };
+  const conf = (n) => (n >= 30 ? 'buona' : n >= 12 ? 'media' : 'bassa');
+  const add = (sev, title, text, tip, n) => out.push({ sev, title, text, tip, n, conf: conf(n) });
+  const days = new Map(); T.forEach((t) => { (days.get(t.trade_date) || days.set(t.trade_date, []).get(t.trade_date)).push(t); });
+
+  // 1. trade presi subito dopo una perdita (stesso giorno, entro 30 minuti)
+  const quick = [];
+  days.forEach((ts) => { for (let i = 1; i < ts.length; i++) { const p = ts[i - 1], c = ts[i], a = mins(p), b = mins(c); if (p.pnl < 0 && a != null && b != null && b - a >= 0 && b - a <= 30) quick.push(c); } });
+  if (quick.length >= 5 && sum(quick) < 0 && avg(quick) < st.expectancy) {
+    add('warn', 'Rientri veloci dopo una perdita', `Dopo una perdita hai riaperto entro 30 minuti ${quick.length} volte: risultato ${money(sum(quick))}, media ${money(avg(quick))} a trade (la tua media generale è ${money(st.expectancy)}).`, 'Prova una pausa fissa dopo ogni stop (per esempio 30 minuti) e riguarda il trade prima di rientrare.', quick.length);
+  }
+  // 2. continuare dopo 2 perdite nello stesso giorno
+  const after2 = [];
+  days.forEach((ts) => { let l = 0; for (const t of ts) { if (l >= 2) after2.push(t); l = t.pnl < 0 ? l + 1 : 0; } });
+  if (after2.length >= 5 && sum(after2) < 0) {
+    add('warn', 'Dopo due perdite di fila nello stesso giorno', `I trade presi dopo 2 perdite consecutive nello stesso giorno sono ${after2.length} e valgono ${money(sum(after2))} in totale (win rate ${pct(after2.filter((t) => t.pnl > 0).length / after2.length)}).`, 'Valuta una regola semplice: dopo 2 stop consecutivi, chiudi la giornata.', after2.length);
+  }
+  // 3. troppi trade in un giorno
+  const dv = [...days.values()].filter((d) => d.length >= 1);
+  if (dv.length >= 8) {
+    const counts = dv.map((d) => d.length).sort((x, y) => x - y), med = counts[Math.floor(counts.length / 2)], lim = Math.max(med * 2, med + 2);
+    const many = dv.filter((d) => d.length >= lim), few = dv.filter((d) => d.length < lim);
+    if (many.length >= 3 && few.length >= 3 && avg(many.map((d) => ({ pnl: sum(d) }))) < 0 && avg(many.map((d) => ({ pnl: sum(d) }))) < avg(few.map((d) => ({ pnl: sum(d) })))) {
+      add('warn', 'Giornate con troppi trade', `Nei giorni con ${lim} o più trade (${many.length} giorni) il risultato medio è ${money(avg(many.map((d) => ({ pnl: sum(d) }))))} al giorno, contro ${money(avg(few.map((d) => ({ pnl: sum(d) }))))} negli altri.`, `Metti un limite di trade giornalieri (per esempio ${Math.max(1, lim - 1)}).`, many.reduce((s, d) => s + d.length, 0));
+    }
+  }
+  // 4. posizione più grande dopo una perdita
+  const cs = T.map((t) => t.contracts).filter((c) => c > 0);
+  if (cs.length >= 10) {
+    const mc = cs.reduce((s, c) => s + c, 0) / cs.length, big = [];
+    days.forEach((ts) => { for (let i = 1; i < ts.length; i++) if (ts[i - 1].pnl < 0 && ts[i].contracts > mc * 1.3) big.push(ts[i]); });
+    if (big.length >= 4 && sum(big) < 0) add('warn', 'Più contratti dopo una perdita', `Per ${big.length} volte, dopo un trade in perdita hai aperto con molti più contratti del solito (oltre il 30% in più): risultato ${money(sum(big))}.`, 'Tieni la stessa size dopo una perdita: aumentare per "recuperare" è la strada più rapida per un conto in rosso.', big.length);
+  }
+  // 5. rischio per trade irregolare
+  const rk = T.map((t) => (t.sl_usd != null && t.sl_usd < 0 ? -t.sl_usd : null)).filter((x) => x != null);
+  if (rk.length >= 10) {
+    const m = rk.reduce((s, x) => s + x, 0) / rk.length, sd = Math.sqrt(rk.reduce((s, x) => s + (x - m) ** 2, 0) / rk.length);
+    if (sd / m > 0.5) add('info', 'Rischio per trade molto variabile', `Lo stop vale in media ${moneyPlain(m)}, ma varia molto (da ${moneyPlain(Math.min(...rk))} a ${moneyPlain(Math.max(...rk))}).`, 'Un rischio costante rende i risultati confrontabili e le statistiche più affidabili.', rk.length);
+  }
+  // 6. vincenti chiusi a mano molto prima del target
+  const man = T.filter((t) => t.outcome === 'MANUALE' && t.pnl > 0 && t.tp_usd > 0);
+  if (man.length >= 4) {
+    const ratio = man.reduce((s, t) => s + t.pnl / t.tp_usd, 0) / man.length;
+    if (ratio < 0.6) add('warn', 'Vincenti chiusi troppo presto', `Hai chiuso a mano ${man.length} trade in guadagno, in media al ${Math.round(ratio * 100)}% del target.`, 'Se il piano prevedeva il target, chiudere prima riduce il guadagno medio senza ridurre le perdite. Controlla nel replay cosa è successo dopo.', man.length);
+  }
+  // 7. perdita enorme rispetto alle altre
+  const losses = T.filter((t) => t.pnl < 0);
+  if (losses.length >= 8) {
+    const worst = losses.reduce((a, b) => (b.pnl < a.pnl ? b : a)), others = losses.filter((t) => t !== worst), mo = -avg(others);
+    if (-worst.pnl > mo * 2.5) add('warn', 'Una perdita molto più grande delle altre', `La perdita peggiore (${money(worst.pnl)} il ${worst.trade_date}) è ${fmt(-worst.pnl / mo)} volte la perdita media.`, 'Guarda quel trade: stop spostato, nessuno stop o size sbagliata? Evitare un caso così pesa più di tutto il resto.', losses.length);
+  }
+  // 8. orari, giorni, setup, emozioni, long/short in perdita
+  const hr = groupBy(T, (t) => [/^\d{1,2}:/.test(t.trade_time || '') ? hourLabel(t.trade_time) : null]).filter((g) => g.n >= 5 && g.pnl < 0).sort((a, b) => a.pnl - b.pnl)[0];
+  if (hr) add('warn', 'Una fascia oraria in perdita', `Tra le ${hr.key.replace('–', ' e le ')} hai ${hr.n} trade con ${money(hr.pnl)} in totale (win rate ${pct(hr.winRate)}).`, 'Prova a non operare in quella fascia per qualche settimana e confronta.', hr.n);
+  const wd = groupBy(T, (t) => [parseYmd(t.trade_date).getDay()]).filter((g) => g.n >= 5 && g.pnl < 0).sort((a, b) => a.pnl - b.pnl)[0];
+  if (wd) add('warn', 'Un giorno della settimana in perdita', `Il ${WEEKDAYS[wd.key].toLowerCase()} hai ${wd.n} trade con ${money(wd.pnl)} in totale.`, 'Chiediti se quel giorno operi con meno attenzione o in condizioni diverse.', wd.n);
+  const su = groupBy(T, (t) => [t.setup]).filter((g) => g.n >= 5 && g.pnl < 0 && g.gl > g.gw).sort((a, b) => a.pnl - b.pnl)[0];
+  if (su) add('warn', 'Un setup che perde', `Il setup "${su.key}" ha ${su.n} trade, ${money(su.pnl)} in totale e win rate ${pct(su.winRate)}.`, 'Riguarda i trade di questo setup: le regole sono chiare? Se non lo sono, mettilo in pausa.', su.n);
+  const em = groupBy(T, (t) => t.emotions).filter((g) => g.n >= 4 && g.avg < 0 && g.avg < st.expectancy).sort((a, b) => a.avg - b.avg)[0];
+  if (em) add('warn', 'Un\'emozione che costa', `Quando segni "${em.key.toLowerCase()}" (${em.n} trade) perdi in media ${moneyPlain(-em.avg)} a trade.`, 'Se ti accorgi di quell\'emozione prima di entrare, salta il trade o dimezza la size.', em.n);
+  const ls = groupBy(T, (t) => [t.direction]).filter((g) => (g.key === 'LONG' || g.key === 'SHORT') && g.n >= 8 && g.pnl < 0)[0];
+  if (ls) add('info', ls.key === 'LONG' ? 'I long non funzionano' : 'Gli short non funzionano', `${ls.key === 'LONG' ? 'In long' : 'In short'} hai ${ls.n} trade con ${money(ls.pnl)} in totale.`, 'Puoi provare a operare solo l\'altro lato per un periodo e vedere come cambia.', ls.n);
+  // 9. rapporto vincita/perdita rispetto al win rate
+  if (st.avgWin && st.avgLoss && st.avgLoss > st.avgWin && st.winRate != null && st.winRate < 1 / (1 + st.avgWin / st.avgLoss)) {
+    add('warn', 'Le perdite sono troppo grandi per il tuo win rate', `Vincita media ${moneyPlain(st.avgWin)}, perdita media ${moneyPlain(st.avgLoss)}: ti servirebbe un win rate sopra il ${Math.round(100 / (1 + st.avgWin / st.avgLoss))}%, ma sei al ${pct(st.winRate)}.`, 'Per riequilibrare, avvicina lo stop o allontana il target.', st.n);
+  }
+  // cosa funziona
+  const g1 = groupBy(T, (t) => [t.setup]).filter((g) => g.n >= 5 && g.pnl > 0 && g.gw > g.gl).sort((a, b) => b.pnl - a.pnl)[0];
+  if (g1) add('ok', 'Un setup che funziona', `Il setup "${g1.key}": ${g1.n} trade, ${money(g1.pnl)}, win rate ${pct(g1.winRate)}.`, 'Valuta di concentrarti su questo.', g1.n);
+  const h1 = groupBy(T, (t) => [/^\d{1,2}:/.test(t.trade_time || '') ? hourLabel(t.trade_time) : null]).filter((g) => g.n >= 5 && g.pnl > 0).sort((a, b) => b.pnl - a.pnl)[0];
+  if (h1) add('ok', 'Una fascia oraria che funziona', `Tra le ${h1.key.replace('–', ' e le ')}: ${h1.n} trade, ${money(h1.pnl)}.`, 'Sono i tuoi orari migliori: proteggili.', h1.n);
+  return { items: out, few: false, n: T.length };
+}
+function correctionsHTML(list) {
+  const c = corrections(list);
+  const head = '<div class="card-head"><h2>Correzioni <span class="beta">beta</span></h2></div>';
+  if (c.few) return `<section class="card">${head}<div class="empty small">Servono almeno 10 trade chiusi in questo anno per avere delle correzioni (ora ${c.n}).</div></section>`;
+  const body = c.items.length ? c.items.map((i) => `<div class="corr ${i.sev}"><div class="corr-t"><b>${esc(i.title)}</b><span class="corr-c" title="Quanti trade hanno usato le regole: con pochi trade il risultato può essere casuale">${i.n} trade · affidabilità ${i.conf}</span></div><div>${esc(i.text)}</div><div class="corr-tip">→ ${esc(i.tip)}</div></div>`).join('')
+    : '<div class="empty small">Nessun comportamento da correggere trovato in questi dati. Continua a segnare setup ed emozioni per avere analisi più precise.</div>';
+  return `<section class="card" id="repCorr">${head}<div class="corr-list">${body}</div><div class="foot-note">Sono regole semplici applicate ai tuoi numeri, senza intelligenza artificiale: segnalano dove guardare, non sono consigli finanziari. Con pochi trade possono dipendere dal caso.</div></section>`;
+}
+
 function renderReports() {
   const page = $('#page');
   const years = [...new Set(S.trades.map((t) => Number(t.trade_date.slice(0, 4))))];
@@ -1434,6 +1584,7 @@ function renderReports() {
     ${kpisHTML(list)}
     <section class="card"><div class="card-head"><h2>Cosa dicono i tuoi dati</h2></div>
       <ul class="insights">${insights(list).map((i) => `<li>${esc(i)}</li>`).join('')}</ul></section>
+    ${correctionsHTML(list)}
     <section class="card" id="repEq"><div class="card-head"><h2>Curva equity ${y}</h2></div>${equityBody(list)}</section>
     <div class="grid2">
       <section class="card"><div class="card-head"><h2>P&amp;L mensile</h2></div><div class="chart">${list.length ? barsSVG(monthRows.map((r) => ({ label: MONTHS_SHORT[r.m], value: r.st.net, title: `${r.name} ${y}` })), { w: 560, height: 300 }) : '<div class="empty small">Nessun trade.</div>'}</div></section>
@@ -1706,8 +1857,9 @@ function renderSettings() {
       <div class="foot-note">Il tema cambia solo l'aspetto: le funzioni sono identiche. Si ricorda su questo dispositivo e sugli altri dove accedi con lo stesso account. Lo trovi anche nel menu del profilo, in alto a destra.</div></section>
     ${S.local ? `<section class="card"><div class="card-head"><h2>Aggiornamenti</h2></div>
       <div class="pad-box"><label class="field"><span>Versione del Journal installata</span><input class="input" readonly value="${esc((S.localInfo && S.localInfo.version) || 'sconosciuta')}"></label>
-        <button class="btn primary" data-act="upd-check">Cerca aggiornamenti</button>
-        <p class="muted small" style="margin:8px 0 0">Il Journal controlla da solo all'avvio se c'è una versione nuova: non devi impostare nient'altro.</p></div></section>` : ''}
+        <label class="field"><span>Indirizzo degli aggiornamenti</span><input class="input" id="updUrl" spellcheck="false" value="${esc(S.updUrl || '')}" placeholder="https://github.com/NOME/trade-logger/releases/latest/download"></label>
+        <div class="row" style="gap:8px;flex-wrap:wrap"><button class="btn primary" data-act="upd-check">Cerca aggiornamenti</button><button class="btn" data-act="upd-save">Salva indirizzo</button></div>
+        <p class="muted small" style="margin:8px 0 0">Il Journal controlla da solo all'avvio se c'è una versione nuova. L'indirizzo è già impostato: cambialo solo se le versioni le pubblichi altrove. Se lo svuoti, torna quello predefinito.</p></div></section>` : ''}
     ${S.local ? localCard() : ''}
     <section class="card"><div class="card-head"><h2>Conti e backtest</h2><div class="grow"></div><button class="btn" data-act="newacc">+ Nuovo</button></div>
       <div class="table-wrap"><table><thead><tr><th>Nome</th><th>Tipo</th><th></th></tr></thead><tbody>
@@ -1951,7 +2103,7 @@ async function renderNews() {
 // =====================================================================
 function localHooks() {
   // Trade Logger (un altro programma) scrive negli stessi file: quando cambiano aggiorno la vista
-  window.localStore.onChange(() => { autoRefresh(); refreshLocalSettings(); });
+  window.localStore.onChange(() => { refreshAccounts(); autoRefresh(); refreshLocalSettings(); });
   setInterval(autoRefresh, 15 * 1000);
   const news = () => S.db.call('refreshNews', { manual: false }).catch(() => {});
   setTimeout(news, 4000); setInterval(news, 3 * 3600e3);       // notizie economiche: da sole, se c'è internet
@@ -1979,6 +2131,7 @@ function localCard() {
 async function localAction(d) {
   const say = (t, err = false) => { S.locMsg = { t, err }; const m = $('#locMsg'); if (m) { m.textContent = t; m.className = 'small ' + (err ? 'neg' : 'pos'); } };   // il messaggio resta anche se la pagina si ridisegna
   if (d.act === 'upd-check') { await S.db.call('updateCheck'); return true; }
+  if (d.act === 'upd-save') { try { const r = await S.db.call('updateSet', { url: ($('#updUrl') || {}).value || '' }); S.updUrl = r.url; const i = $('#updUrl'); if (i) i.value = r.url; toast('Indirizzo salvato'); } catch (e) { toast(errMsg(e), true); } return true; }
   if (d.act === 'loc-open-data') { await S.db.call('openFolder', { which: 'data' }); return true; }
   if (d.act === 'loc-shots-open') { await S.db.call('openFolder', { which: 'shots' }); return true; }
   if (d.act === 'loc-shots-change') {
