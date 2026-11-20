@@ -1,14 +1,14 @@
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-let msg = 'Pronto', open = null, online = null, pending = 0, mode = 'minimal', values = { setup: '', tags: [], note: '', target: 'draft' };
+let msg = 'Pronto', rec = false, open = null, online = null, pending = 0, mode = 'minimal', values = { setup: '', tags: [], note: '', target: 'draft' };
 
 function render() {
   const dot = $('dot');
   const busy = /…$/.test(msg);
-  dot.className = 'dot' + (busy ? ' busy' : open ? ' on' : '');   // blu che pulsa = sto leggendo; verde = c'è un trade aperto; arancione = nessun trade aperto
+  dot.className = 'dot' + (busy ? ' busy' : open ? ' on' : '') + (rec ? ' rec' : '');   // blu che pulsa = sto leggendo; verde = c'è un trade aperto; arancione = nessun trade aperto
   const conn = online ? `Salvo sul PC e invio una copia online (${online.account || 'conto'})` + (pending ? `: ${pending} trade da inviare` : '') : 'Salvataggio sul PC (nessuna copia online)';
   const tr = open ? `Aperto: ${open.symbol || '—'} ${open.direction || ''}` : 'Nessun trade aperto';
-  dot.title = `${conn}\n${msg}\n${tr}`;
+  dot.title = `${conn}\n${msg}\n${tr}` + (rec ? '\nRegistro il replay (beta)' : '');
   dot.setAttribute('aria-label', dot.title);
   $('trade').innerHTML = open ? `${esc(open.symbol || '')} <span class="${open.direction === 'SHORT' ? 'short' : 'long'}">${open.direction === 'SHORT' ? '▼' : '▲'}</span>${open.count > 1 ? `<span class="more-open">+${open.count - 1}</span>` : ''}` : '';
   $('trade').title = open ? `${tr}${open.count > 1 ? ` (+${open.count - 1} altri aperti)` : ''}\nClicca per vedere, chiudere o eliminare i trade aperti` : tr;
@@ -59,5 +59,5 @@ grip.addEventListener('pointerup', stop);
 grip.addEventListener('pointercancel', stop);
 
 api.on('status', (s) => { msg = s; render(); });
-api.on('state', (s) => { open = s.open; online = s.online; pending = s.pending || 0; mode = s.mode || 'minimal'; values = s.values || values; render(); });
+api.on('state', (s) => { rec = !!s.rec; open = s.open; online = s.online; pending = s.pending || 0; mode = s.mode || 'minimal'; values = s.values || values; render(); });
 render();

@@ -10,6 +10,7 @@ body { font: 600 12px/1 "Segoe UI", system-ui, sans-serif; color: var(--text); p
 .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--sl); flex-shrink: 0; margin: 0 2px; }
 .dot.on { background: var(--tp); }
 .dot.wait { background: var(--warn); }
+.dot.rec { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--tp); }
 .dot.busy { background: var(--entry); animation: pulse 1s ease-in-out infinite; }
 @keyframes pulse { 50% { opacity: .35; } }
 .trade { font-weight: 600; font-size: 11.5px; white-space: nowrap; max-width: 110px; overflow: hidden; text-overflow: ellipsis; }

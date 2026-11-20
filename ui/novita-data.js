@@ -1,6 +1,7 @@
 // Elenco delle novità, dalla più recente. Per ogni nuova versione aggiungi una voce in cima.
 window.NOVITA = [
-  { v: '0.15.5', titolo: 'Pallino e pulsanti', righe: [
+  { v: '0.15.6', titolo: 'Replay dei trade (beta) e pallino', righe: [
+    ['Nuovo', 'Replay (beta): se lo attivi (menu della barra o Impostazioni), mentre un trade è aperto la barra salva ogni pochi secondi un fotogramma del grafico. Nel Journal, aprendo il trade, il tasto Replay li fa scorrere dall\'apertura alla chiusura. Vale per i trade aperti da ora in poi.'],
     ['Nuovo', 'Il pallino della barra è verde quando c\'è un trade aperto e arancione quando non ce ne sono. Lo stato della copia online resta nel suggerimento che appare passandoci sopra.'],
     ['Corretto', 'Nella finestra "Copia sul PC" i pulsanti Apertura e Chiusura ora aprono davvero lo screenshot del trade.'] ] },
   { v: '0.15.4', titolo: 'Finestre come prima', righe: [

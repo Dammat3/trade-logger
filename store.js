@@ -214,7 +214,15 @@ function watch(cb) {
   return () => { clearTimeout(timer); w.close(); };
 }
 
+// ---------- replay (beta): fotogrammi del grafico registrati mentre un trade è aperto ----------
+const replayRoot = () => path.join(DATA, 'replay');
+const replayDir = (id) => path.join(replayRoot(), String(id).replace(/[^\w-]/g, '_'));
+function replayFiles(id) {
+  try { return fs.readdirSync(replayDir(id)).filter((f) => /^\d{5}\.jpg$/.test(f)).sort().map((f) => path.join(replayDir(id), f)); } catch { return []; }
+}
+
 module.exports = {
+  replayRoot, replayDir, replayFiles,
   init, dataDir, file, newId, nowIso, readJSON, writeAtomic, withLock,
   readTrades, addTrade, updateTrades, patchTrade, deleteTrade,
   readAccounts, updateAccounts, addAccount, patchAccount, deleteAccount, ensureAccounts,

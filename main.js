@@ -185,6 +185,7 @@ const getTrades = () => store.readTrades();
 function tradesChanged() {
   if (alive(journalWin)) journalWin.webContents.send('trades:changed');
   refreshToolbar();
+  replaySync();
 }
 // conto attivo (locale): il programma funziona anche senza nessun collegamento online
 function activeAccount() {
@@ -212,6 +213,7 @@ function refreshToolbar() {
     open: open ? { symbol: open.symbol, direction: open.direction, count: getTrades().filter((t) => t.status === 'aperto').length } : null,
     online: (link.url && link.key && link.email) ? { account: act ? act.name : '' } : null,       // copia online facoltativa
     pending,
+    rec: !!rec,
     mode: barModeOf(c),
     values: curValues(),
   });
@@ -308,6 +310,7 @@ function warnIfSizeChanged(img, cfg) {
   if (b && (Math.abs(a.width - b.width) > 4 || Math.abs(a.height - b.height) > 4))
     status(`Attenzione: questo schermo è di misura diversa (${a.width}×${a.height}) da quello della calibrazione (${b.width}×${b.height}). Se legge male, ricalibra qui.`);
 }
+let captureBusy = false;
 async function capture(displayId) {
   const displays = screen.getAllDisplays();
   const display = displays.find((d) => String(d.id) === String(displayId)) || screen.getDisplayMatching(toolbar.getBounds());
@@ -317,6 +320,7 @@ async function capture(displayId) {
     throw new Error('Il Mac non mi ha ancora dato il permesso di vedere lo schermo. Si è aperta la finestra "Registrazione schermo": attiva Trade Logger, poi chiudi e riapri Trade Logger e riprova.');
   }
   toolbar.hide();                 // la barra non deve coprire il grafico
+  captureBusy = true;
   await sleep(300);
   try {
     const size = {
@@ -328,6 +332,7 @@ async function capture(displayId) {
     const img = nativeImage.createFromBuffer(src.thumbnail.toPNG(), { scaleFactor: 1 });
     return { img, displayId: display.id };
   } finally {
+    captureBusy = false;
     toolbar.showInactive();
   }
 }
@@ -863,7 +868,7 @@ function platformList() {
 }
 ipcMain.handle('settings:get', async () => {
   const c = getConfig();
-  return { keys: getKeys(), defaults: DEFAULT_KEYS, mode: barModeOf(c), quickSave: !!c.quickSave, accountId: (activeAccount() || {}).id || '', ...platformList(), ...accountsInfo() };
+  return { keys: getKeys(), defaults: DEFAULT_KEYS, mode: barModeOf(c), quickSave: !!c.quickSave, replayRec: !!c.replayRec, replayEvery: replayEvery(), accountId: (activeAccount() || {}).id || '', ...platformList(), ...accountsInfo() };
 });
 ipcMain.handle('settings:platform', (_e, id) => { switchPlatform(id); return platformList(); });
 function createPlatform(name) {
@@ -1437,6 +1442,7 @@ ipcMain.handle('toolbar:menu', () => {
     { label: `Conto: ${(activeAccount() || {}).name || 'nessuno'}`, submenu: accountMenu() },
     { label: `Piattaforma: ${pname}`, submenu: platformMenu() },
     { type: 'separator' },
+    { label: 'Registra il replay dei trade (beta)', type: 'checkbox', checked: replayOn(), click: (mi) => setReplay(mi.checked) },
     { label: 'Impostazioni…', click: () => openSettings() },
     { label: 'Novità di questa versione…', click: () => openNovita() },
     { label: 'Configurazione guidata…', click: () => openWizard() },
@@ -1460,6 +1466,7 @@ ipcMain.handle('toolbar:local', () => openJournal());
 
 // gli screenshot di un trade eliminato vanno nel cestino (non si perdono per sempre)
 function trashShots(t) {
+  try { const rd = store.replayDir(t.id); if (fs.existsSync(rd)) shell.trashItem(rd).catch(() => {}); } catch { /* niente */ }
   for (const rel of [t.shotOpen, t.shotClose, ...((t.images || []).map((i) => i.file))]) {
     const f = store.shotAbs(rel);
     if (f && fs.existsSync(f)) shell.trashItem(f).catch(() => {});
@@ -1692,6 +1699,68 @@ ipcMain.handle('file:open', async (_e, p) => {
   return shell.openPath(f);
 });
 
+
+// ---------- Replay del trade (beta) ----------
+// Finché un trade è aperto, ogni pochi secondi salvo un fotogramma ridotto del grafico (la stessa area degli screenshot).
+// Nel Journal il tasto "Replay" li fa scorrere dall'apertura alla chiusura. Si attiva dal menu della barra o dalle Impostazioni.
+const REPLAY_MAX = 900;                       // massimo di fotogrammi per trade (circa 30 minuti a 2 secondi)
+let rec = null;                               // { id, dir, n, last, timer, busy }
+const replayOn = () => !!getConfig().replayRec;
+const replayEvery = () => Math.min(10, Math.max(1, Number(getConfig().replayEvery) || 2));
+function stopRec() {
+  if (!rec) return;
+  clearInterval(rec.timer); rec = null;
+  try { if (alive(toolbar)) toolbar.setContentProtection(false); } catch { /* non supportato */ }
+  refreshToolbar();
+}
+async function recTick() {
+  const r = rec;
+  if (!r || r.busy || captureBusy || !alive(toolbar)) return;
+  r.busy = true;
+  try {
+    const cur = getTrades().find((x) => x.id === r.id);
+    if (!cur || cur.status !== 'aperto') { stopRec(); replaySync(); return; }     // chiuso o eliminato (anche dal Journal)
+    if (process.platform === 'darwin' && systemPreferences.getMediaAccessStatus('screen') !== 'granted') return;
+    const display = screen.getDisplayMatching(toolbar.getBounds());
+    const size = { width: Math.round(display.size.width * display.scaleFactor), height: Math.round(display.size.height * display.scaleFactor) };
+    const sources = await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: size });
+    const src = sources.find((s) => s.display_id === String(display.id)) || sources[0];
+    if (!src || rec !== r) return;
+    let img = forJournal(src.thumbnail, getConfig());
+    if (img.getSize().width > 1000) img = img.resize({ width: 1000, quality: 'good' });
+    const buf = img.toJPEG(60);
+    const sig = require('crypto').createHash('md5').update(buf).digest('hex');
+    if (sig === r.last) return;                       // grafico fermo (pausa): non serve un fotogramma uguale
+    r.last = sig;
+    if (r.n >= REPLAY_MAX) { status('Replay: raggiunto il massimo di fotogrammi per questo trade'); stopRec(); return; }
+    r.n += 1;
+    await fs.promises.writeFile(path.join(r.dir, String(r.n).padStart(5, '0') + '.jpg'), buf);
+  } catch (e) {
+    try { fs.appendFileSync(path.join(store.dataDir() || __dirname, 'errori.log'), `${new Date().toISOString()} (replay) ${e && e.stack || e}\n`); } catch { /* niente */ }
+  } finally { r.busy = false; }
+}
+// da richiamare quando cambia qualcosa (trade aperto/chiuso, interruttore): avvia, ferma o lascia com'è
+function replaySync() {
+  try {
+    const open = replayOn() ? getTrades().filter((t) => t.status === 'aperto').pop() : null;
+    if (!open) return stopRec();
+    if (rec && rec.id === open.id) return;
+    stopRec();
+    const dir = store.replayDir(open.id);
+    store.mkdirp(dir);
+    rec = { id: open.id, dir, n: store.replayFiles(open.id).length, last: '', timer: null, busy: false };
+    rec.timer = setInterval(recTick, replayEvery() * 1000);
+    try { toolbar.setContentProtection(true); } catch { /* la barra potrebbe comparire nei fotogrammi */ }
+    refreshToolbar();
+  } catch (e) { status('Replay non disponibile: ' + (e && e.message || e)); stopRec(); }
+}
+function setReplay(on, every) {
+  const c = getConfig(); c.replayRec = !!on; if (every != null) c.replayEvery = Math.min(10, Math.max(1, Number(every) || 2)); saveConfig(c);
+  stopRec(); replaySync();
+  return { on: replayOn(), every: replayEvery() };
+}
+ipcMain.handle('settings:replay', (_e, on, every) => setReplay(on, every));
+
 // ---------- avvio ----------
 // un errore inatteso non deve bloccare il programma con una finestra di errore: lo scrivo in errori.log e lo segnalo sulla barra
 process.on('uncaughtException', (e) => {
@@ -1723,6 +1792,7 @@ app.whenReady().then(() => {
     }
   }, 2500);
   getWorker().catch((e) => console.error('OCR non pronto:', e)); // prepara l'OCR in anticipo
+  setTimeout(replaySync, 1500);              // trade rimasto aperto con il replay attivo: riprende a registrare
   setTimeout(syncAll, 3000);                 // invia eventuali trade rimasti indietro
   setTimeout(() => pushSetups().then(refreshLists), 4000);          // consegna al database i setup creati finora solo sul PC
   applyLocalApi();

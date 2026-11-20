@@ -916,6 +916,7 @@ function tradeViewHTML() {
     <div class="tv-head">
       <div class="tv-title"><b>${esc(date)}</b><span class="muted">Trade ${i + 1} di ${n}${t.status === 'aperto' ? ' · aperto' : ''}${t.source === 'trade-logger' ? ' · da Trade Logger' : ''}</span></div>
       <span class="grow"></span>
+      ${S.local && V.replay && V.replay[t.id] ? '<button class="btn" data-tvreplay title="Rivedi le candele dall\'apertura alla chiusura">▶ Replay <span class="beta">beta</span></button>' : ''}
       <button class="btn primary" data-tvedit>✎ Modifica</button>
       <button class="btn ghost icon" data-tvclose aria-label="Chiudi">✕</button>
     </div>
@@ -946,7 +947,7 @@ function renderTradeView() { V.el.innerHTML = tradeViewHTML(); }
 async function openTradeView(day, focusId) {
   const list = S.trades.filter((t) => t.trade_date === day); if (!list.length) return openDayEdit(day, focusId);
   if (V) closeTradeView();
-  V = { day, id: (list.find((t) => t.id === focusId) || list[0]).id, urls: {}, el: null };
+  V = { day, id: (list.find((t) => t.id === focusId) || list[0]).id, urls: {}, replay: {}, el: null };
   const ov = document.createElement('div'); ov.className = 'overlay tv'; ov.id = 'tvOverlay'; V.el = ov;
   document.body.appendChild(ov); document.body.style.overflow = 'hidden';
   document.addEventListener('keydown', onTvKey);
@@ -956,14 +957,59 @@ async function openTradeView(day, focusId) {
     if (b.matches('[data-tvclose]')) return closeTradeView();
     if (b.matches('[data-tvmove]')) return tvMove(Number(b.dataset.tvmove));
     if (b.matches('[data-tvedit]')) return tvEdit();
+    if (b.matches('[data-tvreplay]')) return openReplay(tradeById(V.id));
     if (b.dataset.tvimg) { const t = tradeById(V.id); if (t) openViewer(t, b.dataset.tvimg); }
   });
   const paths = list.flatMap((t) => (t.trade_images || []).map((x) => x.path)).filter(Boolean);
   renderTradeView();
+  if (S.local) S.db.call('replayInfo', { ids: list.map((t) => t.id) }).then((m) => { if (V && V.el === ov) { V.replay = m || {}; renderTradeView(); } }).catch(() => {});
   if (paths.length) {
     try { Object.assign(V.urls, await S.db.imageUrls(paths)); } catch (e) { toast('Non riesco a caricare le immagini: ' + errMsg(e), true); }
     if (V && V.el === ov) renderTradeView();
   }
+}
+
+// ---------- Replay (beta): i fotogrammi registrati da Trade Logger, in sequenza ----------
+async function openReplay(t) {
+  if (!t || $('.rp')) return;
+  let urls = [];
+  try { urls = await S.db.call('replayFrames', { id: t.id }); } catch (e) { return toast('Non riesco a caricare il replay: ' + errMsg(e), true); }
+  if (!urls.length) return toast('Questo trade non ha fotogrammi registrati.', true);
+  const ov = document.createElement('div'); ov.className = 'overlay rp';
+  ov.innerHTML = `<div class="rp-win" role="dialog" aria-modal="true" aria-label="Replay del trade">
+    <div class="rp-head"><b>${esc(t.symbol || 'Trade')}${t.direction ? ' ' + (t.direction === 'LONG' ? 'Long' : 'Short') : ''}</b><span class="muted">Replay <span class="beta">beta</span></span><span class="grow"></span>
+      <button class="btn ghost icon" data-rpclose aria-label="Chiudi">✕</button></div>
+    <div class="rp-stage"><img alt="Fotogramma del replay"></div>
+    <div class="rp-bar">
+      <button class="btn" data-rpplay aria-label="Avvia o metti in pausa">⏸</button>
+      <input type="range" min="0" max="${urls.length - 1}" value="0" data-rpseek aria-label="Posizione">
+      <span class="rp-count muted small"></span>
+      <select data-rpspeed aria-label="Velocità"><option value="2">0,5×</option><option value="4" selected>1×</option><option value="8">2×</option><option value="16">4×</option><option value="32">8×</option></select>
+    </div></div>`;
+  document.body.appendChild(ov);
+  const img = ov.querySelector('img'), seek = ov.querySelector('[data-rpseek]'), cnt = ov.querySelector('.rp-count'), pb = ov.querySelector('[data-rpplay]'), sp = ov.querySelector('[data-rpspeed]');
+  let i = 0, playing = true, timer = null;
+  urls.forEach((u) => { const p = new Image(); p.src = u; });           // li carico in anticipo per una riproduzione fluida
+  const show = (k) => { i = Math.max(0, Math.min(urls.length - 1, k)); img.src = urls[i]; seek.value = i; cnt.textContent = `${i + 1} / ${urls.length}`; };
+  const stop = () => { playing = false; clearInterval(timer); pb.textContent = '▶'; };
+  const play = () => {
+    if (i >= urls.length - 1) show(0);
+    playing = true; pb.textContent = '⏸'; clearInterval(timer);
+    timer = setInterval(() => { if (i >= urls.length - 1) return stop(); show(i + 1); }, 1000 / Number(sp.value));
+  };
+  const close = () => { clearInterval(timer); document.removeEventListener('keydown', onKey, true); ov.remove(); };
+  function onKey(e) {
+    if (e.key === 'Escape') { e.stopPropagation(); close(); }
+    else if (e.key === ' ') { e.preventDefault(); playing ? stop() : play(); }
+    else if (e.key === 'ArrowLeft') { stop(); show(i - 1); }
+    else if (e.key === 'ArrowRight') { stop(); show(i + 1); }
+  }
+  document.addEventListener('keydown', onKey, true);
+  ov.addEventListener('mousedown', (e) => { if (e.target === ov) close(); });
+  ov.addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; if (b.matches('[data-rpclose]')) close(); else if (b.matches('[data-rpplay]')) { playing ? stop() : play(); } });
+  seek.addEventListener('input', () => { stop(); show(Number(seek.value)); });
+  sp.addEventListener('change', () => { if (playing) play(); });
+  show(0); play();
 }
 function tvMove(k) {
   const list = vTrades(); if (list.length < 2) return;
@@ -976,7 +1022,7 @@ function closeTradeView() {
   V.el.remove(); document.body.style.overflow = ''; document.removeEventListener('keydown', onTvKey); V = null;
 }
 function onTvKey(e) {
-  if (!V || $('.viewer') || $('.modal.small') || e.target.closest?.('input, textarea, select')) return;
+  if (!V || $('.viewer') || $('.rp') || $('.modal.small') || e.target.closest?.('input, textarea, select')) return;
   if (e.key === 'Escape') closeTradeView();
   else if (e.key === 'ArrowLeft') tvMove(-1);
   else if (e.key === 'ArrowRight') tvMove(1);

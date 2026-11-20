@@ -84,6 +84,16 @@
     </div>
   </section>
 
+  <section class="card">
+    <h2>Replay dei trade <span class="beta">(beta)</span></h2>
+    <p class="muted small">Quando un trade è aperto, la barra salva ogni pochi secondi un fotogramma del grafico. Nel Journal, aprendo il trade, il tasto Replay li fa scorrere dall'apertura alla chiusura. Vale solo per i trade aperti da ora in poi e occupa spazio sul disco (qualche MB per trade).</p>
+    <div class="choice">
+      <label><input type="checkbox" id="replayRec"> <span><b>Registra il replay dei trade</b><br><span class="muted small">Mentre registra, il pallino della barra ha un anello intorno.</span></span></label>
+    </div>
+    <label class="row" style="margin-top:8px">Un fotogramma ogni
+      <select id="replayEvery"><option value="1">1 secondo (più fluido)</option><option value="2">2 secondi</option><option value="3">3 secondi</option><option value="5">5 secondi (più leggero)</option></select></label>
+  </section>
+
   <details class="card advall" id="advAll">
     <summary><span class="h2">Avanzate</span><span class="muted small tag">layout, scorciatoie, cartella screenshot, aggiornamenti, condivisione</span></summary>
   <section class="card inner">
