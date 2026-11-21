@@ -1,5 +1,11 @@
 // Elenco delle novità, dalla più recente. Per ogni nuova versione aggiungi una voce in cima.
 window.NOVITA = [
+  { v: '0.15.15', titolo: 'Simbolo, finestre e prezzi', righe: [
+    ['Corretto', 'Simbolo: la barra riconosce anche il nome esteso dello strumento (per esempio "Micro E-mini NASDAQ-100 Index Futures" diventa MNQ).'],
+    ['Nuovo', 'Dopo la calibrazione puoi correggere il simbolo letto direttamente nel riepilogo: la barra lo ricorda. Lo impara anche quando lo correggi nella finestra di conferma di un trade.'],
+    ['Corretto', 'Le finestrelle "Nuovo setup" e "Nuovo tag" si aprono dove le avevi lasciate l\'ultima volta e restano sempre dentro lo schermo, anche se la barra è in basso.'] ] },
+  { v: '0.15.14', titolo: 'Salvataggio automatico nel menu', righe: [
+    ['Nuovo', 'L\'interruttore "Salva subito se è tutto a posto" è ora anche nel menu dei tre puntini, sopra il replay. Resta anche nelle Impostazioni.'] ] },
   { v: '0.15.13', titolo: 'Lettura più precisa dei prezzi', righe: [
     ['Migliorato', 'La barra ora legge anche la scala dei prezzi a destra del grafico e la usa per controllare i prezzi di ingresso, take profit e stop loss. Serve quando il puntino sull\'etichetta copre le cifre (TradeSea) o l\'OCR sbaglia una cifra. Se un prezzo si ricava solo dall\'altezza, la finestra di conferma lo segnala.'] ] },
   { v: '0.15.12', titolo: 'Mac con chip Apple', righe: [

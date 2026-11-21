@@ -370,6 +370,13 @@ async function readBalance(img, cfg, forceWide = false) {
   return { balance, text, widened };
 }
 
+const rawKey = (t) => String(t || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+function learnSymbol(raw, symbol) {
+  const k = rawKey(raw), s = String(symbol || '').trim().toUpperCase();
+  if (k.length < 2 || !s) return;
+  const c = getConfig(); c.symbolMap = { ...(c.symbolMap || {}), [k]: s }; saveConfig(c);
+}
+ipcMain.handle('calib:symbol', (_e, raw, symbol) => { learnSymbol(raw, symbol); return true; });
 async function analyze(img, cfg) {
   const res = { tp: null, sl: null, entry: null };
   let scaleCtx = null;
@@ -456,6 +463,8 @@ async function analyze(img, cfg) {
     const known = [...new Set([...getTrades().map((t) => t.symbol), cfg.lastSymbol, ...(cfg.knownSymbols || [])].filter(Boolean))];
     const sx = parseSymbolEx(raw, known);
     res.symbol = sx.symbol; res.symbolRaw = raw.trim(); res.symbolFixed = sx.fixedFrom;
+    const learned = (cfg.symbolMap || {})[rawKey(raw)];          // correzione insegnata dall'utente per questo testo
+    if (learned) { res.symbol = learned; res.symbolFixed = null; }
   }
   if (scaleCtx) { try { await scaleCorrect(img, res, scaleCtx); } catch (e) { /* la scala è un aiuto in più: se non riesce resta la lettura normale */ } }
   reconcileMoney(res);
@@ -710,13 +719,20 @@ function openPrompt(opts) {
   promptOpts = opts;
   return new Promise((resolve) => {
     promptResolve = resolve;
-    const b = toolbar.getBounds();
+    const W = 360, H = opts.multiline ? 250 : 150, b = toolbar.getBounds();
+    // dove l'avevi lasciata l'ultima volta; altrimenti sotto la barra (o sopra, se sotto non c'è spazio). Sempre dentro lo schermo.
+    const saved = getConfig().promptPos;
+    const want = saved && Number.isFinite(saved.x) && Number.isFinite(saved.y) ? { x: saved.x, y: saved.y } : { x: b.x, y: b.y + b.height + 4 };
+    const wa = screen.getDisplayNearestPoint({ x: want.x + 20, y: want.y + 20 }).workArea;
+    if (!saved && want.y + H > wa.y + wa.height) want.y = b.y - H - 4;
+    const px = Math.max(wa.x, Math.min(want.x, wa.x + wa.width - W)), py = Math.max(wa.y, Math.min(want.y, wa.y + wa.height - H));
     promptWin = new BrowserWindow({
-      width: 360, height: opts.multiline ? 250 : 150, x: b.x, y: b.y + b.height + 4,
+      width: W, height: H, x: px, y: py,
       alwaysOnTop: true, resizable: true, minimizable: false, maximizable: false,
       backgroundColor: '#14161b', title: opts.title,
       icon: path.join(__dirname, 'build', 'icon.png'), webPreferences: { preload: path.join(__dirname, 'preload.js') },
     });
+    promptWin.on('close', () => { try { const bb = promptWin.getBounds(); const c = getConfig(); c.promptPos = { x: bb.x, y: bb.y }; saveConfig(c); } catch { /* niente */ } });
     promptWin.setMenuBarVisibility(false);
     promptWin.loadFile('ui/prompt.html');
     promptWin.on('closed', () => { promptWin = null; if (promptResolve) { promptResolve(null); promptResolve = null; } });
@@ -1154,7 +1170,7 @@ async function newTrade() {
   const when = await tradeWhen(img, cfg);
   const dv = curValues();
   const sym = v.symbol || cfg.lastSymbol || '';
-  const od = { mode: 'open', shot, ...v, symbol: sym, symbolRead: !!v.symbol, priceHint: priceHint(v, sym), layoutNote: [lay.info.note, calibNote].filter(Boolean).join(' '), setup: dv.setup, tags: dv.tags, note: dv.note, ...when,
+  const od = { mode: 'open', shot, ...v, symbol: sym, symbolAuto: v.symbol || '', symbolRead: !!v.symbol, priceHint: priceHint(v, sym), layoutNote: [lay.info.note, calibNote].filter(Boolean).join(' '), setup: dv.setup, tags: dv.tags, note: dv.note, ...when,
     backtest: activeKind() === 'backtest' };
   if (quickOpenOk(od)) saveQuick(od); else openConfirm(od);
 }
@@ -1476,6 +1492,7 @@ ipcMain.handle('toolbar:menu', () => {
     { label: 'Apri il Journal', click: () => openJournalApp() },
     { label: 'Journal semplice (dentro la barra)', click: () => openJournal() },
     { type: 'separator' },
+    { label: 'Salva subito se è tutto a posto', type: 'checkbox', checked: quickOn(), click: (mi) => { const c = getConfig(); c.quickSave = mi.checked; saveConfig(c); } },
     { label: 'Registra il replay dei trade (beta)', type: 'checkbox', checked: replayOn(), click: (mi) => setReplay(mi.checked) },
     { label: 'Configurazione guidata…', click: () => openWizard() },
     { type: 'separator' },
@@ -1552,6 +1569,8 @@ ipcMain.handle('confirm:cancel', () => { pending = null; if (alive(confirmWin)) 
 function applyConfirm(d) {
   const num = (x) => parseNumber(x);
   if (d.mode === 'open') {
+    // se hai corretto il simbolo letto, la prossima volta la barra lo legge già giusto
+    if (d.symbolRaw && d.symbolAuto && d.symbol && String(d.symbol).trim().toUpperCase() !== String(d.symbolAuto).toUpperCase()) learnSymbol(d.symbolRaw, d.symbol);
     const t = {
       id: Date.now().toString(36),
       status: 'aperto',

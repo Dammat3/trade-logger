@@ -367,7 +367,24 @@ function resolveToken(raw, roots) {
   return { symbol: s.length >= 2 ? s : null, fixedFrom: null, known: false };
 }
 // legge il simbolo e lo "aggancia" ai simboli che conosco (future comuni + quelli che hai già usato)
+// Nome esteso del prodotto (es. "Micro E-mini NASDAQ-100 Index Futures" su FX Replay) -> simbolo. Prima di tutto il resto: nei nomi
+// ci sono parole come MINI, INDEX o FUTURES che altrimenti verrebbero scambiate per simboli.
+function symbolByName(text) {
+  const s = String(text || '').toUpperCase().replace(/[^A-Z0-9&]/g, '');
+  if (s.length < 8) return null;
+  const micro = /MICRO/.test(s);
+  if (/NASDAQ|NDX/.test(s)) return micro ? 'MNQ' : 'NQ';
+  if (/S&P|SP500|SANDP/.test(s)) return micro ? 'MES' : 'ES';
+  if (/DOWJONES|DJIA|MINIDOW|EMINIDOW/.test(s)) return micro ? 'MYM' : 'YM';
+  if (/RUSSELL/.test(s)) return micro ? 'M2K' : 'RTY';
+  if (/GOLD/.test(s)) return micro ? 'MGC' : 'GC';
+  if (/CRUDE/.test(s)) return micro ? 'MCL' : 'CL';
+  if (/BITCOIN/.test(s)) return micro ? 'MBT' : 'BTC';
+  return null;
+}
 function parseSymbolEx(text, known = []) {
+  const byName = symbolByName(text);
+  if (byName && !/[A-Z]{2,5}:[A-Z0-9]{2,6}/.test(String(text || '').toUpperCase()) && !/\([A-Z0-9!]{2,12}\)/.test(String(text || '').toUpperCase())) return { symbol: byName, fixedFrom: null };
   const roots = [...new Set([...FUT_ROOTS, ...known.map((x) => String(x || '').toUpperCase()).filter(plausibleSymbol)])];
   let t = String(text || '').toUpperCase().replace(/[^A-Z0-9:!()\s]/g, ' ');
   const par = t.match(/\(([A-Z0-9!]{2,12})\)/); if (par) t = par[1];          // tra parentesi, se c'è
@@ -381,6 +398,7 @@ function parseSymbolEx(text, known = []) {
 }
 function parseSymbol(text, known = []) { return parseSymbolEx(text, known).symbol; }
 module.exports.parseSymbolEx = parseSymbolEx;
+module.exports.symbolByName = symbolByName;
 module.exports.boxColumns = boxColumns;
 module.exports.parseSymbol = parseSymbol;
 
