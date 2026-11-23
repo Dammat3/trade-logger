@@ -353,21 +353,75 @@ function saveShot(img, prefix) {
   return file;
 }
 
+// TradeSea: con un trade aperto il saldo (Bal) si muove insieme al profitto/perdita in corso (UP&L).
+// Per avere il saldo iniziale si calibra tutta la riga (Bal, RP&L, UP&L) e si toglie l'UP&L dal Bal:
+// saldo iniziale = Bal - UP&L (in profitto si sottrae, in perdita il segno meno fa sommare).
+function isTradeSea() {
+  try {
+    const c = getConfig(), p = (c.platforms || {})[c.activePlatform] || {};
+    return /tradesea/i.test(String(p.name || '')) || /tradesea/i.test(String(c.activePlatform || ''));
+  } catch (e) { return false; }
+}
+// \"102.702,5\" o \"1,234.50\" o \"122\" -> numero (l'ultimo separatore è quello dei decimali, tranne 3 cifre dopo un solo separatore = migliaia)
+function moneyToNumber(s) {
+  let t = String(s).replace(/[^0-9.,]/g, '');
+  if (!t) return null;
+  const lastDot = t.lastIndexOf('.'), lastCom = t.lastIndexOf(',');
+  if (lastDot >= 0 && lastCom >= 0) {
+    const dec = Math.max(lastDot, lastCom);
+    t = t.slice(0, dec).replace(/[.,]/g, '') + '.' + t.slice(dec + 1);
+  } else if (lastDot >= 0 || lastCom >= 0) {
+    const i = Math.max(lastDot, lastCom), tail = t.length - i - 1, many = (t.match(/[.,]/g) || []).length > 1;
+    if (many || tail === 3) t = t.replace(/[.,]/g, ''); else t = t.slice(0, i) + '.' + t.slice(i + 1);
+  }
+  const n = parseFloat(t);
+  return Number.isFinite(n) ? n : null;
+}
+const AMOUNT_RE = /[+\-\u2212]?\s*\$?\s*[+\-\u2212]?\s*\d[\d.,]*/g;
+function amountValue(tok) {
+  const n = moneyToNumber(tok);
+  return n == null ? null : (/[\-\u2212]/.test(tok) ? -n : n);
+}
+// legge l'UP&L dalla riga del saldo. Prima cerca l'etichetta \"UP&L\" (secondo giro di lettura con le lettere),
+// altrimenti prende il terzo importo della riga (Bal, RP&L, UP&L). Se non c'è nessun importo oltre a Bal e RP&L: 0.
+async function readUnrealized(img, rect, plainText) {
+  let upl = null, how = '';
+  try {
+    const t = await ocr(img, rect, 'ABLPRUabl&0123456789.,$+-:', true);
+    const m = t.match(/U\s*P\s*&?\s*L\s*:?\s*([+\-\u2212]?\s*\$?\s*[+\-\u2212]?\s*\d[\d.,]*)/i);
+    if (m) { upl = amountValue(m[1]); how = 'etichetta'; }
+  } catch (e) { /* secondo giro non riuscito: provo con la posizione */ }
+  if (upl == null) {
+    const toks = (plainText.match(AMOUNT_RE) || []).map((x) => x.trim());
+    if (toks.length >= 3) { upl = amountValue(toks[2]); how = 'terzo importo'; }
+    else { upl = 0; how = 'nessun UP&L visibile'; }
+  }
+  return { upl, how };
+}
+
 async function readBalance(img, cfg, forceWide = false) {
   if (!cfg.balanceRect) return { balance: null, text: '' };
-  // accanto al saldo, con un trade aperto, c'è il P&L in corso ("$50,000.00 • +$0.00"): prendo solo il primo importo
+  // accanto al saldo, con un trade aperto, c'è il P&L in corso (\"$50,000.00 • +$0.00\"): prendo solo il primo importo
   const r = clampRect(cfg.balanceRect, img);
   let text = await ocr(img, r, '0123456789.,$+-', true);
-  let balance = parseBalance(text), widened = false;
+  let balance = parseBalance(text), widened = false, usedRect = r;
   // il saldo può spostarsi (es. FX Replay: chiuso il trade sparisce il P&L accanto e il saldo scorre a destra):
   // se nel rettangolo non c'è, lo cerco in una fascia più larga
   if (forceWide || balance == null || !/\d[.,]?\d{2}/.test(text)) {
     const x = Math.max(0, r.x - 200), w = clampRect({ x, y: Math.max(0, r.y - 3), width: r.x - x + r.width + 200, height: r.height + 6 }, img);
     const t2 = await ocr(img, w, '0123456789.,$+-', true);
     const b2 = parseBalance(t2);
-    if (b2 != null) { balance = b2; text = t2; widened = true; }
+    if (b2 != null) { balance = b2; text = t2; widened = true; usedRect = w; }
   }
-  return { balance, text, widened };
+  // TradeSea: tolgo l'UP&L dal saldo per avere il saldo iniziale
+  let upl = null, uplHow = '', rawBalance = balance;
+  if (balance != null && isTradeSea()) {
+    const u = await readUnrealized(img, usedRect, text);
+    uplHow = u.how;
+    // un UP&L più grande di metà saldo è quasi certamente una lettura sbagliata: non lo uso
+    if (u.upl != null && Math.abs(u.upl) <= Math.abs(balance) * 0.5) { upl = u.upl; balance = round2(balance - upl); }
+  }
+  return { balance, text, widened, rawBalance, upl, uplHow };
 }
 
 async function analyze(img, cfg) {
