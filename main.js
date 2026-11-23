@@ -501,6 +501,8 @@ async function analyze(img, cfg) {
   }
   const b = await readBalance(img, cfg);
   res.balance = b.balance;
+  if (b.upl != null && b.rawBalance != null) res.balanceInfo = `TradeSea: Bal ${b.rawBalance} − UP&L ${b.upl} = saldo iniziale ${b.balance} (UP&L letto da: ${b.uplHow})`;
+  else if (b.uplHow) res.balanceInfo = `TradeSea: UP&L non usato (${b.uplHow}), saldo letto ${b.balance}`;
   // simbolo dello strumento (es. "CME MINI:MNQ" -> MNQ), se la zona è stata calibrata
   if (cfg.symbolRect) {
     const raw = await ocr(img, clampRect(cfg.symbolRect, img), 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789:!()-', true);
@@ -969,7 +971,7 @@ ipcMain.handle('settings:test-read', async () => {
     let when = {};
     try { when = await tradeWhen(img, cfg) || {}; } catch {}
     const sz = img.getSize();
-    return { layout: lay.info.note || '', size: `${sz.width}×${sz.height}`, entry: v.entry, tp: v.tp, sl: v.sl, symbol: v.symbol || null, balance: v.balance === undefined ? null : v.balance, date: when.tradeDate || null, time: when.tradeTime || null, hint: priceHint(v, v.symbol || cfg.lastSymbol || '') || '' };
+    return { layout: lay.info.note || '', size: `${sz.width}×${sz.height}`, entry: v.entry, tp: v.tp, sl: v.sl, symbol: v.symbol || null, balance: v.balance === undefined ? null : v.balance, date: when.tradeDate || null, time: when.tradeTime || null, hint: [priceHint(v, v.symbol || cfg.lastSymbol || '') || '', v.balanceInfo || ''].filter(Boolean).join('\n') };
   } finally { if (alive(settingsWin)) { settingsWin.show(); settingsWin.focus(); } if (alive(wizardWin)) { wizardWin.show(); wizardWin.focus(); } }
 });
 ipcMain.handle('settings:pause-keys', () => { globalShortcut.unregisterAll(); });   // mentre registri una scorciatoia
@@ -1652,6 +1654,24 @@ ipcMain.handle('calib:save', async (_e, rects) => {
   const rp = await readReplay(calib.img, c);
   return { ...res, replayTime: rp.time, replayDate: rp.date, hasClock: !!c.clockRect, hasAxis: !!c.axisRect, hasSymbol: !!c.symbolRect, hasShot: !!c.shotRect };
 });
+// TradeSea: il riquadro del saldo deve comprendere tutta la riga (Bal, RP&L, UP&L), non solo il primo importo.
+// Parto dal riquadro trovato dalla calibrazione automatica e lo allargo con le parole lette sulla stessa riga:
+// a sinistra fino a "Bal", a destra finché le parole sono vicine (ci sono circa 25-70 pixel tra Bal, RP&L e UP&L).
+function widenBalanceLine(rect, words, size) {
+  const cy0 = rect.y - rect.height * 0.4, cy1 = rect.y + rect.height * 1.4;
+  const line = words.filter((w) => { const cy = (w.y0 + w.y1) / 2; return cy >= cy0 && cy <= cy1; }).sort((a, b) => a.x0 - b.x0);
+  let left = rect.x, right = rect.x + rect.width, top = rect.y, bottom = rect.y + rect.height, extra = 0;
+  const bal = line.find((w) => /^b[a4]l/i.test(w.t) && w.x0 < rect.x && rect.x - w.x1 < 40);
+  if (bal) { left = bal.x0 - 4; top = Math.min(top, bal.y0); bottom = Math.max(bottom, bal.y1); }
+  for (const w of line) {
+    if (w.x0 < right - 2) continue;
+    if (w.x0 - right > 110) break;
+    right = Math.max(right, w.x1); top = Math.min(top, w.y0); bottom = Math.max(bottom, w.y1); extra++;
+  }
+  if (!extra) return null;
+  const x = Math.max(0, Math.round(left)), y = Math.max(0, Math.round(top - 2));
+  return { x, y, width: Math.min(size.width - x, Math.round(right + 6 - x)), height: Math.min(size.height - y, Math.round(bottom + 2 - y)) };
+}
 // calibrazione automatica: trova da sola colonna dei prezzi, saldo, orologio e riga della data (vedi autocal.js)
 ipcMain.handle('calib:auto', async () => {
   if (!calib) return null;
@@ -1663,6 +1683,11 @@ ipcMain.handle('calib:auto', async () => {
     const { data } = await w.recognize(img.toPNG());
     const words = (data.words || []).map((x) => ({ t: x.text, x0: x.bbox.x0, y0: x.bbox.y0, x1: x.bbox.x1, y1: x.bbox.y1 }));
     const r = autocal.buildRects(size, col, words);
+    if (isTradeSea() && r && r.rects && r.rects.balanceRect) {
+      const wide = widenBalanceLine(r.rects.balanceRect, words, size);
+      if (wide) { r.rects.balanceRect = wide; r.notes = [...(r.notes || []), 'TradeSea: il riquadro del saldo comprende tutta la riga (Bal, RP&L, UP&L).']; }
+      else r.notes = [...(r.notes || []), 'TradeSea: non ho trovato RP&L e UP&L accanto al saldo. Allarga a mano il riquadro del saldo fino a UP&L.'];
+    }
     const hues = {}; if (c.hues) for (const k of ['TP', 'SL', 'ENTRY']) if (c.hues[k]) hues[k] = c.hues[k].h;   // i colori già insegnati restano
     return { ...r, hues, size, multiple: !!(col && col.multiple) };
   } catch (e) { return { rects: {}, found: {}, notes: ['Non sono riuscito a leggere lo schermo: ' + (e.message || e)], hues: {}, size: calib.img.getSize() }; }
