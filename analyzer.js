@@ -367,7 +367,24 @@ function resolveToken(raw, roots) {
   return { symbol: s.length >= 2 ? s : null, fixedFrom: null, known: false };
 }
 // legge il simbolo e lo "aggancia" ai simboli che conosco (future comuni + quelli che hai già usato)
+// Nome esteso del prodotto (es. "Micro E-mini NASDAQ-100 Index Futures" su FX Replay) -> simbolo. Prima di tutto il resto: nei nomi
+// ci sono parole come MINI, INDEX o FUTURES che altrimenti verrebbero scambiate per simboli.
+function symbolByName(text) {
+  const s = String(text || '').toUpperCase().replace(/[^A-Z0-9&]/g, '');
+  if (s.length < 8) return null;
+  const micro = /MICRO/.test(s);
+  if (/NASDAQ|NDX/.test(s)) return micro ? 'MNQ' : 'NQ';
+  if (/S&P|SP500|SANDP/.test(s)) return micro ? 'MES' : 'ES';
+  if (/DOWJONES|DJIA|MINIDOW|EMINIDOW/.test(s)) return micro ? 'MYM' : 'YM';
+  if (/RUSSELL/.test(s)) return micro ? 'M2K' : 'RTY';
+  if (/GOLD/.test(s)) return micro ? 'MGC' : 'GC';
+  if (/CRUDE/.test(s)) return micro ? 'MCL' : 'CL';
+  if (/BITCOIN/.test(s)) return micro ? 'MBT' : 'BTC';
+  return null;
+}
 function parseSymbolEx(text, known = []) {
+  const byName = symbolByName(text);
+  if (byName && !/[A-Z]{2,5}:[A-Z0-9]{2,6}/.test(String(text || '').toUpperCase()) && !/\([A-Z0-9!]{2,12}\)/.test(String(text || '').toUpperCase())) return { symbol: byName, fixedFrom: null };
   const roots = [...new Set([...FUT_ROOTS, ...known.map((x) => String(x || '').toUpperCase()).filter(plausibleSymbol)])];
   let t = String(text || '').toUpperCase().replace(/[^A-Z0-9:!()\s]/g, ' ');
   const par = t.match(/\(([A-Z0-9!]{2,12})\)/); if (par) t = par[1];          // tra parentesi, se c'è
@@ -381,6 +398,7 @@ function parseSymbolEx(text, known = []) {
 }
 function parseSymbol(text, known = []) { return parseSymbolEx(text, known).symbol; }
 module.exports.parseSymbolEx = parseSymbolEx;
+module.exports.symbolByName = symbolByName;
 module.exports.boxColumns = boxColumns;
 module.exports.parseSymbol = parseSymbol;
 
@@ -465,3 +483,126 @@ function parseReplayDateSmart(text, opts = {}) {
   return null;
 }
 module.exports.parseReplayDateSmart = parseReplayDateSmart;
+
+// ===================== Scala dei prezzi (asse destro) =====================
+// Su alcune piattaforme (es. TradeSea) le etichette di TP/SL non sono riquadri pieni e il puntino di trascinamento copre le cifre
+// centrali: l'OCR legge "2 3.50" invece di 25713.50. Ma i numeri dell'asse (25,720.00 / 25,710.00 …) si leggono bene e stanno a distanza
+// regolare: da quelli ricavo la retta "altezza sullo schermo → prezzo". L'altezza dell'etichetta dà il prezzo con circa mezzo punto di
+// errore, e le ultime cifre ancora visibili dell'etichetta fanno il resto.
+
+// "25,780.00" -> 25780 | "25.780,00" -> 25780 | "25780.00" -> 25780
+function parseAxisTick(text) {
+  const t = String(text || '').trim();
+  if (/^\d{1,3}(,\d{3})+(\.\d+)?$/.test(t)) return Number(t.replace(/,/g, ''));
+  if (/^\d{1,3}(\.\d{3})+(,\d+)?$/.test(t)) return Number(t.replace(/\./g, '').replace(',', '.'));
+  if (/^\d+\.\d+$/.test(t)) return Number(t);
+  if (/^\d+,\d{1,3}$/.test(t)) return Number(t.replace(',', '.'));
+  return null;
+}
+
+// punti [{ y, v }] (altezza in pixel, valore) -> { a, b, n, rms } con prezzo = a*y + b, oppure null.
+// Tengo solo i numeri che stanno su una stessa retta (quelli coperti da etichette colorate o letti male si scartano).
+function fitAxis(points) {
+  const P = points.filter((p) => Number.isFinite(p.y) && Number.isFinite(p.v)).sort((p, q) => p.y - q.y);
+  if (P.length < 3) return null;
+  const med = (arr) => { const s = arr.slice().sort((x, y) => x - y); return s[Math.floor(s.length / 2)]; };
+  const slopes = [];
+  for (let i = 0; i < P.length; i++) for (let j = i + 1; j < P.length; j++) if (P[j].y - P[i].y > 8) slopes.push((P[j].v - P[i].v) / (P[j].y - P[i].y));
+  if (slopes.length < 2) return null;
+  const a0 = med(slopes);
+  if (!a0 || a0 >= 0) return null;                 // i prezzi crescono verso l'alto: la pendenza è negativa
+  const b0 = med(P.map((p) => p.v - a0 * p.y));
+  const step = med(P.slice(1).map((p, i) => Math.abs(p.v - P[i].v)).filter((d) => d > 0)) || Math.abs(a0) * 20;
+  let inl = P.filter((p) => Math.abs(p.v - (a0 * p.y + b0)) <= 0.3 * step);
+  if (inl.length < 3) return null;
+  // minimi quadrati sui punti buoni
+  const n = inl.length, sy = inl.reduce((s, p) => s + p.y, 0), sv = inl.reduce((s, p) => s + p.v, 0);
+  const syy = inl.reduce((s, p) => s + p.y * p.y, 0), syv = inl.reduce((s, p) => s + p.y * p.v, 0);
+  const den = n * syy - sy * sy;
+  if (!den) return null;
+  const a = (n * syv - sy * sv) / den, b = (sv - a * sy) / n;
+  const rms = Math.sqrt(inl.reduce((s, p) => s + ((p.v - (a * p.y + b)) / a) ** 2, 0) / n);   // errore medio in pixel
+  if (a >= 0 || rms > 2.5) return null;
+  return { a, b, n, rms, step };
+}
+
+// altezza esatta della linea dell'ordine: la linea colorata continua a sinistra dell'etichetta, sottile (1-2 pixel).
+// buf = striscia BGRA (a sinistra dell'asse) che copre le altezze y0..y0+height; yc = altezza stimata dall'etichetta.
+function refineLineY(buf, width, height, name, hues, yc) {
+  const test = testsFor(hues)[name], lo = Math.max(0, Math.round(yc) - 9), hi = Math.min(height - 1, Math.round(yc) + 9);
+  const cnt = [];
+  for (let y = lo; y <= hi; y++) { let c = 0; for (let x = 0; x < width; x++) { const i = (y * width + x) * 4; if (test(buf[i + 2], buf[i + 1], buf[i])) c++; } cnt.push(c); }
+  const max = Math.max(...cnt, 0);
+  if (max < Math.max(10, width * 0.35)) return yc;                 // niente linea chiara: resto sull'etichetta
+  const k = cnt.indexOf(max);
+  let sw = 0, sy = 0;
+  for (let j = Math.max(0, k - 1); j <= Math.min(cnt.length - 1, k + 1); j++) { sw += cnt[j]; sy += cnt[j] * (lo + j); }
+  return sy / sw;
+}
+
+// Prezzo dell'etichetta ricavato dalla scala. coarse = prezzo dall'altezza, tick = passo minimo del prezzo,
+// ocrDigits = cifre lette dall'OCR (anche incomplete), implied = prezzo ricavato dall'importo in dollari (facoltativo).
+// Restituisce { price, how } oppure null se non c'è nulla di abbastanza sicuro.
+function snapToScale(coarse, tick, dec, ocrDigits, a, implied) {
+  const W = Math.max(3 * tick, 4 * Math.abs(a));
+  const k0 = Math.floor((coarse - W) / tick), k1 = Math.ceil((coarse + W) / tick);
+  const dg = String(ocrDigits || '').replace(/\D/g, '');
+  let best = null;
+  for (let k = k0; k <= k1; k++) {
+    const c = Math.round(k * tick * 10 ** dec) / 10 ** dec;
+    const s = String(Math.round(c * 10 ** dec));
+    let suf = 0;
+    while (suf < s.length && suf < dg.length && s[s.length - 1 - suf] === dg[dg.length - 1 - suf]) suf++;
+    const imp = implied != null && Math.abs(c - implied) < tick / 2;
+    const score = Math.min(suf, 6) * 10 + (imp ? 14 : 0) - (Math.abs(c - coarse) / tick) * 0.5;
+    if (!best || score > best.score) best = { price: c, suf, imp, score };
+  }
+  if (!best) return null;
+  if (best.suf >= 3 || best.imp) return { price: best.price, how: best.imp && best.suf < 3 ? 'importo' : 'cifre' };
+  return null;
+}
+const SYMBOL_TICK = { MNQ: 0.25, NQ: 0.25, MES: 0.25, ES: 0.25, MYM: 1, YM: 1, M2K: 0.1, RTY: 0.1, MGC: 0.1, GC: 0.1, MCL: 0.01, CL: 0.01, SIL: 0.005, SI: 0.005 };
+function tickOf(symbol, values, dec) {
+  if (SYMBOL_TICK[symbol]) return SYMBOL_TICK[symbol];
+  const v = values.filter((x) => x != null);
+  if (v.length && v.every((x) => Math.abs(x * 4 - Math.round(x * 4)) < 1e-6)) return 0.25;
+  return 10 ** -dec;
+}
+
+// Corregge i prezzi letti usando la scala. res = { tp, sl, entry, tpUsd, slUsd, contracts, symbol }; ys = { tp, sl, entry } altezze delle linee
+// nello stesso sistema di coordinate dei punti della scala; texts = testo OCR di ogni etichetta.
+// Restituisce l'elenco delle correzioni [{ field, from, to, how }] e modifica res.
+function applyScale(res, fit, ys, texts, dec) {
+  const fixes = [];
+  if (!fit) return fixes;
+  const tick = tickOf(res.symbol, [res.tp, res.sl, res.entry], dec), px = Math.abs(fit.a);
+  const coarse = {};
+  for (const k of ['entry', 'tp', 'sl']) if (ys[k] != null) coarse[k] = fit.a * ys[k] + fit.b;
+  const pv = SYMBOL_PV[res.symbol], c = res.contracts;
+  const sufLen = (v, dg) => { if (v == null) return 0; const s = String(Math.round(v * 10 ** dec)); let n = 0; while (n < s.length && n < dg.length && s[s.length - 1 - n] === dg[dg.length - 1 - n]) n++; return n; };
+  let entryGuess = false;
+  for (const k of ['entry', 'tp', 'sl']) {
+    if (coarse[k] == null) continue;
+    const cur = res[k], dg = String(texts[k] || '').replace(/\D/g, '');
+    let implied = null;
+    const usd = k === 'tp' ? res.tpUsd : k === 'sl' ? res.slUsd : null;
+    if (usd != null && pv && c && res.entry != null) {
+      const sign = Math.sign(coarse[k] - res.entry) || 1;
+      implied = Math.round((res.entry + sign * Math.abs(usd) / (pv * c)) / tick) * tick;
+      if (Math.abs(implied - coarse[k]) > Math.max(3 * tick, 4 * px)) implied = null;               // non coerente con l'altezza: lo ignoro
+    }
+    const sn = snapToScale(coarse[k], tick, dec, dg, fit.a, implied);
+    const near = cur != null && Math.abs(cur - coarse[k]) <= Math.max(1.5 * tick, 2.5 * px);
+    // lettura che torna con la scala: la tengo, salvo che le cifre visibili dell'etichetta indichino chiaramente un altro prezzo vicino
+    if (near && !(sn && sn.how === 'cifre' && sn.price !== cur && sufLen(cur, dg) < 3)) continue;
+    let how = sn ? sn.how : 'scala';
+    if (k !== 'entry' && how === 'importo' && entryGuess) how = 'scala';                            // l'importo vale solo se l'ingresso è sicuro
+    const to = sn ? sn.price : Math.round(coarse[k] / tick) * tick;
+    if (cur === to) continue;
+    if (k === 'entry' && how === 'scala') entryGuess = true;
+    fixes.push({ field: k, from: cur, to: Math.round(to * 10 ** dec) / 10 ** dec, how });
+    res[k] = fixes[fixes.length - 1].to;
+  }
+  return fixes;
+}
+Object.assign(module.exports, { parseAxisTick, fitAxis, refineLineY, snapToScale, applyScale, tickOf });

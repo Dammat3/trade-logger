@@ -67,6 +67,7 @@ contextBridge.exposeInMainWorld('api', {
   // calibrazione
   getCalibration: () => ipcRenderer.invoke('calib:get'),
   saveCalibration: (rects) => ipcRenderer.invoke('calib:save', rects),
+  calibSymbol: (raw, symbol) => ipcRenderer.invoke('calib:symbol', raw, symbol),
   calibAuto: () => ipcRenderer.invoke('calib:auto'),
   closeCalibration: () => ipcRenderer.invoke('calib:close'),
   // journal

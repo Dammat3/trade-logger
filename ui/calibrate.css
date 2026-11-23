@@ -34,3 +34,5 @@ html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: 
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes slide { 0% { left: -35%; } 100% { left: 100%; } }
 @media (prefers-reduced-motion: reduce) { .spin, .bar i { animation-duration: 3s; } }
+
+.symfix { width: 90px; padding: 3px 6px; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.25); border-radius: 6px; color: inherit; font: inherit; text-transform: uppercase; }

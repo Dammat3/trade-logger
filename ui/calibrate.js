@@ -109,9 +109,14 @@ async function finish() {
     <tr><td class="muted">Ingresso</td><td>${v(r.entry)}</td><td class="muted">contratti</td><td>${v(r.contracts)}</td></tr>
     <tr><td class="muted">Direzione</td><td>${v(r.direction)}</td><td class="muted">saldo</td><td>${v(r.balance)}</td></tr>
     <tr><td class="muted">Screenshot nel journal</td><td>${r.hasShot ? 'solo l\'area scelta' : 'tutto lo schermo'}</td><td></td><td></td></tr>
-        <tr><td class="muted">Simbolo</td><td>${r.hasSymbol ? v(r.symbol) : '<span class="muted">saltato</span>'}</td><td></td><td></td></tr>
+        <tr><td class="muted">Simbolo</td><td>${r.hasSymbol ? `<input id="symFix" class="symfix" value="${(r.symbol || '').replace(/"/g, '')}" maxlength="12" title="Se il simbolo è sbagliato, scrivi quello giusto: la barra lo ricorderà">` : '<span class="muted">saltato</span>'}</td><td colspan="2" class="muted">${r.hasSymbol ? 'sbagliato? correggilo qui' : ''}</td></tr>
     <tr><td class="muted">Ora del replay</td><td>${r.hasClock ? v(r.replayTime) : '<span class="muted">saltato</span>'}</td><td class="muted">data</td><td>${r.hasAxis ? (r.replayDate || '<span class="muted">non visibile ora</span>') : '<span class="muted">saltato</span>'}</td></tr></table>
     <div class="muted note">Se non c'era un trade aperto sullo schermo è normale che prezzi, valori e contratti risultino "non letti".</div>`;
+  const sf = $('symFix');
+  if (sf) {
+    const save = () => { const val = sf.value.trim().toUpperCase(); sf.value = val; if (val && r.symbolRaw) api.calibSymbol(r.symbolRaw, val); };
+    sf.addEventListener('change', save); sf.addEventListener('keydown', (e) => { if (e.key === 'Enter') { save(); sf.blur(); } });
+  }
 }
 
 function pos(e) {

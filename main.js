@@ -6,7 +6,7 @@ const { fetchEvents } = require('./newsfetch');
 const path = require('path');
 const fs = require('fs');
 const { createWorker } = require('tesseract.js');
-const { parseSymbolEx, parseReplayDateSmart, findAxisBoxes } = require('./analyzer');
+const { parseSymbolEx, parseReplayDateSmart, findAxisBoxes, parseAxisTick, fitAxis, refineLineY, applyScale } = require('./analyzer');
 const autocal = require('./autocal');
 const { labelCoverage, boxColumns, findLabels, findOrderBox, labelSpan, decimalsOf, pickPrices, parseContracts, parseBoxMoney, parseBalance, reconcileMoney, parseNumber, direction, parseReplayTime, parseReplayDate } = require('./analyzer');
 const { createClient } = require('@supabase/supabase-js');
@@ -424,8 +424,16 @@ async function readBalance(img, cfg, forceWide = false) {
   return { balance, text, widened, rawBalance, upl, uplHow };
 }
 
+const rawKey = (t) => String(t || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+function learnSymbol(raw, symbol) {
+  const k = rawKey(raw), s = String(symbol || '').trim().toUpperCase();
+  if (k.length < 2 || !s) return;
+  const c = getConfig(); c.symbolMap = { ...(c.symbolMap || {}), [k]: s }; saveConfig(c);
+}
+ipcMain.handle('calib:symbol', (_e, raw, symbol) => { learnSymbol(raw, symbol); return true; });
 async function analyze(img, cfg) {
   const res = { tp: null, sl: null, entry: null };
+  let scaleCtx = null;
   if (cfg.priceRect) {
     const r = clampRect(cfg.priceRect, img);
     const crop = img.crop(r);
@@ -488,6 +496,7 @@ async function analyze(img, cfg) {
       }
     }
     Object.assign(res, picked);
+    scaleCtx = { r, crop, hues, labels, texts: { ...texts }, dec };
     // contratti e valore in denaro: dal riquadro dell'ordine ("8 | -496.00 USD")
     for (const [name, key] of [['SL', 'slUsd'], ['TP', 'tpUsd']]) {
       if (!boxes[name]) continue;
@@ -508,10 +517,41 @@ async function analyze(img, cfg) {
     const known = [...new Set([...getTrades().map((t) => t.symbol), cfg.lastSymbol, ...(cfg.knownSymbols || [])].filter(Boolean))];
     const sx = parseSymbolEx(raw, known);
     res.symbol = sx.symbol; res.symbolRaw = raw.trim(); res.symbolFixed = sx.fixedFrom;
+    const learned = (cfg.symbolMap || {})[rawKey(raw)];          // correzione insegnata dall'utente per questo testo
+    if (learned) { res.symbol = learned; res.symbolFixed = null; }
   }
+  if (scaleCtx) { try { await scaleCorrect(img, res, scaleCtx); } catch (e) { /* la scala è un aiuto in più: se non riesce resta la lettura normale */ } }
   reconcileMoney(res);
   res.direction = direction(res);
   return res;
+}
+
+// Scala dei prezzi: legge i numeri dell'asse (25,720.00 / 25,710.00 …), ne ricava la retta "altezza → prezzo" e con questa corregge
+// i prezzi delle etichette che l'OCR ha letto male (puntino di trascinamento sopra le cifre, etichette non piene come su TradeSea).
+async function scaleCorrect(img, res, ctx) {
+  const { r, crop, hues, labels, texts } = ctx;
+  if (!labels.TP && !labels.SL && !labels.ENTRY) return;
+  const { width, height } = crop.getSize();
+  const w = await getWorker();
+  await w.setParameters({ tessedit_char_whitelist: '0123456789.,', tessedit_pageseg_mode: '6' });
+  const big = crop.resize({ width: width * 3, height: height * 3, quality: 'best' });
+  const { data } = await w.recognize(big.toPNG());
+  const pts = (data.words || []).map((x) => ({ y: r.y + (x.bbox.y0 + x.bbox.y1) / 2 / 3, v: parseAxisTick(x.text) })).filter((p) => p.v != null);
+  const fit = fitAxis(pts);
+  if (!fit) return;
+  // altezza esatta delle linee: la linea colorata continua a sinistra dell'asse
+  const sw = Math.min(56, r.x - 2), ys = {}, sx = r.x - sw;
+  const strip = sw >= 20 ? img.crop({ x: sx, y: r.y, width: sw, height }).toBitmap() : null;
+  for (const [name, key] of [['TP', 'tp'], ['SL', 'sl'], ['ENTRY', 'entry']]) {
+    const L = labels[name]; if (!L) continue;
+    const yc = (L.y0 + L.y1) / 2;
+    ys[key] = r.y + (strip ? refineLineY(strip, sw, height, name, hues, yc) : yc);
+  }
+  const fixes = applyScale(res, fit, ys, texts, ctx.dec);
+  if (fixes.length) {
+    res.scaleFix = fixes;
+    res.scaleGuess = fixes.some((f) => f.how === 'scala');      // solo dall'altezza, senza cifre né importo che lo confermino: da controllare
+  }
 }
 
 
@@ -733,13 +773,20 @@ function openPrompt(opts) {
   promptOpts = opts;
   return new Promise((resolve) => {
     promptResolve = resolve;
-    const b = toolbar.getBounds();
+    const W = 360, H = opts.multiline ? 250 : 150, b = toolbar.getBounds();
+    // dove l'avevi lasciata l'ultima volta; altrimenti sotto la barra (o sopra, se sotto non c'è spazio). Sempre dentro lo schermo.
+    const saved = getConfig().promptPos;
+    const want = saved && Number.isFinite(saved.x) && Number.isFinite(saved.y) ? { x: saved.x, y: saved.y } : { x: b.x, y: b.y + b.height + 4 };
+    const wa = screen.getDisplayNearestPoint({ x: want.x + 20, y: want.y + 20 }).workArea;
+    if (!saved && want.y + H > wa.y + wa.height) want.y = b.y - H - 4;
+    const px = Math.max(wa.x, Math.min(want.x, wa.x + wa.width - W)), py = Math.max(wa.y, Math.min(want.y, wa.y + wa.height - H));
     promptWin = new BrowserWindow({
-      width: 360, height: opts.multiline ? 250 : 150, x: b.x, y: b.y + b.height + 4,
+      width: W, height: H, x: px, y: py,
       alwaysOnTop: true, resizable: true, minimizable: false, maximizable: false,
       backgroundColor: '#14161b', title: opts.title,
       icon: path.join(__dirname, 'build', 'icon.png'), webPreferences: { preload: path.join(__dirname, 'preload.js') },
     });
+    promptWin.on('close', () => { try { const bb = promptWin.getBounds(); const c = getConfig(); c.promptPos = { x: bb.x, y: bb.y }; saveConfig(c); } catch { /* niente */ } });
     promptWin.setMenuBarVisibility(false);
     promptWin.loadFile('ui/prompt.html');
     promptWin.on('closed', () => { promptWin = null; if (promptResolve) { promptResolve(null); promptResolve = null; } });
@@ -1177,7 +1224,7 @@ async function newTrade() {
   const when = await tradeWhen(img, cfg);
   const dv = curValues();
   const sym = v.symbol || cfg.lastSymbol || '';
-  const od = { mode: 'open', shot, ...v, symbol: sym, symbolRead: !!v.symbol, priceHint: priceHint(v, sym), layoutNote: [lay.info.note, calibNote].filter(Boolean).join(' '), setup: dv.setup, tags: dv.tags, note: dv.note, ...when,
+  const od = { mode: 'open', shot, ...v, symbol: sym, symbolAuto: v.symbol || '', symbolRead: !!v.symbol, priceHint: priceHint(v, sym), layoutNote: [lay.info.note, calibNote].filter(Boolean).join(' '), setup: dv.setup, tags: dv.tags, note: dv.note, ...when,
     backtest: activeKind() === 'backtest' };
   if (quickOpenOk(od)) saveQuick(od); else openConfirm(od);
 }
@@ -1269,7 +1316,7 @@ const quickOn = () => !!getConfig().quickSave;
 const nz = (x) => x !== null && x !== undefined && x !== '';
 function quickOpenOk(d) {
   return quickOn() && nz(d.symbol) && (d.direction === 'LONG' || d.direction === 'SHORT') && nz(d.entry) && nz(d.tp) && nz(d.sl) && nz(d.balance)
-    && !d.priceHint && !d.moneyCheck && !d.priceFixed && !d.dateHint && nz(d.tradeDate) && (d.backtest ? nz(d.tradeTime) : true);
+    && !d.priceHint && !d.moneyCheck && !d.priceFixed && !d.scaleGuess && !d.dateHint && nz(d.tradeDate) && (d.backtest ? nz(d.tradeTime) : true);
 }
 function quickCloseOk(d) { return quickOn() && nz(d.balanceAfter) && nz(d.pnl) && !d.pnlHint; }
 function saveQuick(data) {
@@ -1499,6 +1546,7 @@ ipcMain.handle('toolbar:menu', () => {
     { label: 'Apri il Journal', click: () => openJournalApp() },
     { label: 'Journal semplice (dentro la barra)', click: () => openJournal() },
     { type: 'separator' },
+    { label: 'Salva subito se è tutto a posto', type: 'checkbox', checked: quickOn(), click: (mi) => { const c = getConfig(); c.quickSave = mi.checked; saveConfig(c); } },
     { label: 'Registra il replay dei trade (beta)', type: 'checkbox', checked: replayOn(), click: (mi) => setReplay(mi.checked) },
     { label: 'Configurazione guidata…', click: () => openWizard() },
     { type: 'separator' },
@@ -1575,6 +1623,8 @@ ipcMain.handle('confirm:cancel', () => { pending = null; if (alive(confirmWin)) 
 function applyConfirm(d) {
   const num = (x) => parseNumber(x);
   if (d.mode === 'open') {
+    // se hai corretto il simbolo letto, la prossima volta la barra lo legge già giusto
+    if (d.symbolRaw && d.symbolAuto && d.symbol && String(d.symbol).trim().toUpperCase() !== String(d.symbolAuto).toUpperCase()) learnSymbol(d.symbolRaw, d.symbol);
     const t = {
       id: Date.now().toString(36),
       status: 'aperto',
